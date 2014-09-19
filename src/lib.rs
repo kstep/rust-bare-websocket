@@ -3,6 +3,7 @@
 extern crate url;
 extern crate openssl;
 extern crate serialize;
+extern crate "rust-crypto" as crypto;
 
 #[cfg(test)]
 extern crate test;
@@ -16,8 +17,14 @@ use std::io::{Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
 use std::io::net::tcp::TcpStream;
 use std::io::net::ip::{SocketAddr, Ipv4Addr};
 use std::io::net::get_host_addresses;
+use std::rand::Rng;
+use std::rand;
 use std::collections::TreeMap;
+use serialize::base64::ToBase64;
+use serialize::base64;
 use serialize::json::{Json, ToJson};
+use crypto::sha1::Sha1;
+use crypto::digest::Digest;
 use openssl::ssl;
 use openssl::ssl::{SslStream, SslContext};
 
@@ -51,7 +58,22 @@ impl Writer for NetworkStream {
     }
 }
 
-static WEBSOCKET_GUID: &'static str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+static WEBSOCKET_GUID: &'static [u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+fn generate_nonce() -> String {
+    let mut nonce = [0u8, ..10];
+    rand::task_rng().fill_bytes(nonce);
+    nonce.to_base64(base64::STANDARD)
+}
+
+fn encode_nonce(nonce: &str) -> String {
+    let mut sha1 = Sha1::new();
+    let mut result = [0u8, ..20];
+    sha1.input(nonce.as_bytes());
+    sha1.input(WEBSOCKET_GUID);
+    sha1.result(result);
+    result.to_base64(base64::STANDARD)
+}
 
 bitflags! {
     #[deriving(Show)] flags WSHeader: u16 {
@@ -111,7 +133,7 @@ impl WebSocket {
             handshake_finished: false,
             remote_addr: Some(SocketAddr{ ip: addr, port: port }),
             url: url,
-            use_ssl: use_ssl
+            use_ssl: use_ssl,
         })
     }
 
@@ -128,7 +150,7 @@ impl WebSocket {
         Ok(())
     }
 
-    fn send_headers(&mut self) -> IoResult<()> {
+    fn send_headers(&mut self, nonce: &str) -> IoResult<()> {
         let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::NotConnected)) };
         try!(s.write(format!("GET {} HTTP/1.1\r\n", self.url.serialize_path().unwrap_or("/".to_string())).as_bytes()));
         try!(s.write(format!("Host: {}\r\n", self.url.host().unwrap()).as_bytes()));
@@ -137,12 +159,12 @@ impl WebSocket {
         try!(s.write(format!("Origin: {}\r\n", self.url.serialize_no_fragment()).as_bytes()));
         try!(s.write("Sec-WebSocket-Protocol: char, superchat\r\n".as_bytes()));
         try!(s.write("Sec-WebSocket-Version: 13\r\n".as_bytes()));
-        try!(s.write("Sec-WebSocket-Key: {}\r\n".as_bytes()));
+        try!(s.write(format!("Sec-WebSocket-Key: {}\r\n", nonce).as_bytes()));
         try!(s.write("\r\n".as_bytes()));
         s.flush()
     }
 
-    fn read_response(&mut self) -> IoResult<()> {
+    fn read_response(&mut self, nonce: &str) -> IoResult<()> {
         let spaces: &[_] = &[' ', '\t', '\r', '\n'];
         let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::NotConnected)) };
         let status = try!(s.read_line()).as_slice().splitn(2, ' ').nth(1).and_then(|s| from_str::<uint>(s));
@@ -159,23 +181,24 @@ impl WebSocket {
 
         try!(s.flush());
 
-        if WebSocket::check_nonce("{}", headers.find(&"Sec-WebSocket-Accept".to_string()).unwrap_or(&"".to_string()).as_slice()) {
-            Ok(())
-        } else {
-            Err(standard_error(io::InvalidInput))
+        let response = headers.find(&"Sec-WebSocket-Accept".to_string());
+        match response {
+            Some(r) if nonce == r.as_slice() => (),
+            _ => return Err(standard_error(io::InvalidInput))
         }
-    }
 
-    fn check_nonce(nonce: &str, response: &str) -> bool {
-        true
+        Ok(())
     }
 
     fn handshake(&mut self) -> IoResult<()> {
-        try!(self.connect());
-        try!(self.send_headers());
-        try!(self.read_response());
+        let nonce = generate_nonce();
+
+        try!(self.connect()
+             .and_then(|()| self.send_headers(nonce.as_slice()))
+             .and_then(|()| self.read_response(encode_nonce(nonce.as_slice()).as_slice())));
 
         self.handshake_finished = true;
+
         Ok(())
     }
 
@@ -195,20 +218,24 @@ impl WebSocket {
     fn read_message(&mut self) -> IoResult<WSMessage> {
         let header = try!(self.read_header());
         let len = try!(self.read_length(&header));
-        let mask = if header.contains(WS_MASK) { Some(try!(self.read_be_u32())) } else { None };
-        let data = try!(self.read_exact(len));
-        // TODO: unmask data
+
+        let data = if header.contains(WS_MASK) {
+            WebSocket::unmask_data(try!(self.read_exact(len)), try!(self.read_be_u32()))
+        } else {
+            try!(self.read_exact(len))
+        };
+
         Ok(WSMessage { header: header, data: data })
+    }
+
+    fn unmask_data(data: Vec<u8>, mask: u32) -> Vec<u8> {
+        data.iter().enumerate().map(|(i, b)| b ^ (mask >> ((i % 4) << 3) & 0xff) as u8).collect::<Vec<u8>>()
     }
 
     // TODO: send_message(&mut self, &WSMessage) -> IoResult<()>
 
     fn iter(&mut self) -> WSMessages {
         WSMessages { sock: self }
-    }
-
-    fn unmask_data(data: &mut [u8], mask: u32) -> &[u8] {
-        data
     }
 }
 

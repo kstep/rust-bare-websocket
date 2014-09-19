@@ -9,3 +9,6 @@ git = "https://github.com/servo/rust-url.git"
 
 [dependencies.openssl]
 git = "https://github.com/sfackler/rust-openssl.git"
+
+[dependencies.rust-crypto]
+git = "https://github.com/DaGenix/rust-crypto.git"
