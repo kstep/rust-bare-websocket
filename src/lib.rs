@@ -153,15 +153,12 @@ impl WebSocket {
             _ => return Err(standard_error(io::InvalidInput))
         }
 
-        println!("status: {}", status);
         let headers = s.lines().map(|r| r.unwrap_or("\r\n".to_string())) .take_while(|l| l.as_slice() != "\r\n")
             .map(|s| s.as_slice().splitn(1, ':').map(|s| s.trim_chars(spaces).to_string()).collect::<Vec<String>>())
             .map(|p| (p[0].to_string(), p[1].to_string()))
             .collect::<TreeMap<String, String>>();
 
         try!(s.flush());
-
-        println!("headers: {}", headers);
 
         if WebSocket::check_nonce("{}", headers.find(&"Sec-WebSocket-Accept".to_string()).unwrap_or(&"".to_string()).as_slice()) {
             Ok(())
@@ -190,15 +187,11 @@ impl WebSocket {
 
     fn read_length(&mut self, header: &WSHeader) -> IoResult<uint> {
         let len = header & WS_LEN;
-        println!("hlen: {} & {} = {}", header, WS_LEN, len);
-        if len == WS_LEN16 {
-            println!("u16 len");
-            self.read_be_u16().map(|v| v as uint)
-        } else if len == WS_LEN64 {
-            println!("u64 len");
-            self.read_be_u64().map(|v| v as uint)
-        } else {
-            Ok(len.bits as uint)
+
+        match header & WS_LEN {
+            WS_LEN16 => self.read_be_u16().map(|v| v as uint),
+            WS_LEN64 => self.read_be_u64().map(|v| v as uint),
+            len => Ok(len.bits as uint)
         }
     }
 
@@ -212,7 +205,7 @@ impl WebSocket {
     }
 
     // TODO: send_message(&mut self, &WSMessage) -> IoResult<()>
-    
+
     fn iter(&mut self) -> WSMessages {
         WSMessages { sock: self }
     }
@@ -227,16 +220,6 @@ struct WSMessage {
     header: WSHeader,
     data: Vec<u8>
 }
-
-//impl Show for WSMessage {
-    //fn fmt(&self, f: &mut Formatter) -> Result<(), FormatError> {
-        //f.write_str("WSMessage(");
-        //try!(self.header.fmt(f));
-        //try!(self.data.fmt(f));
-        //f.write_str(")");
-        //Ok(())
-    //}
-//}
 
 impl WSMessage {
     fn to_string(&self) -> String {
