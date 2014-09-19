@@ -1,0 +1,11 @@
+[package]
+
+name = "websocket"
+version = "0.0.1"
+authors = ["Konstantin Stepanov <me@kstep.me>"]
+
+[dependencies.url]
+git = "https://github.com/servo/rust-url.git"
+
+[dependencies.openssl]
+git = "https://github.com/sfackler/rust-openssl.git"
