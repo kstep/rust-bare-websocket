@@ -16,9 +16,7 @@ use std::io::{Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
 use std::io::net::tcp::TcpStream;
 use std::io::net::ip::{SocketAddr, Ipv4Addr};
 use std::io::net::get_host_addresses;
-use std::fmt::{Show, Formatter, FormatError};
 use std::collections::TreeMap;
-use serialize::json;
 use serialize::json::{Json, ToJson};
 use openssl::ssl;
 use openssl::ssl::{SslStream, SslContext};
@@ -117,6 +115,7 @@ impl WebSocket {
         })
     }
 
+    #[allow(unused_variable)]
     fn connect(&mut self) -> IoResult<()> {
         let s = try!(self.remote_addr.map(|ref a| TcpStream::connect(format!("{}", a.ip).as_slice(), a.port)).unwrap_or_else(|| Err(standard_error(io::InvalidInput))));
         self.stream = Some(BufferedStream::new(
@@ -130,7 +129,7 @@ impl WebSocket {
     }
 
     fn send_headers(&mut self) -> IoResult<()> {
-        let mut s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::NotConnected)) };
+        let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::NotConnected)) };
         try!(s.write(format!("GET {} HTTP/1.1\r\n", self.url.serialize_path().unwrap_or("/".to_string())).as_bytes()));
         try!(s.write(format!("Host: {}\r\n", self.url.host().unwrap()).as_bytes()));
         try!(s.write("Upgrade: websocket\r\n".as_bytes()));
@@ -145,7 +144,7 @@ impl WebSocket {
 
     fn read_response(&mut self) -> IoResult<()> {
         let spaces: &[_] = &[' ', '\t', '\r', '\n'];
-        let mut s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::NotConnected)) };
+        let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::NotConnected)) };
         let status = try!(s.read_line()).as_slice().splitn(2, ' ').nth(1).and_then(|s| from_str::<uint>(s));
 
         match status {
@@ -186,8 +185,6 @@ impl WebSocket {
     }
 
     fn read_length(&mut self, header: &WSHeader) -> IoResult<uint> {
-        let len = header & WS_LEN;
-
         match header & WS_LEN {
             WS_LEN16 => self.read_be_u16().map(|v| v as uint),
             WS_LEN64 => self.read_be_u64().map(|v| v as uint),
@@ -233,6 +230,7 @@ impl ToJson for WSMessage {
     }
 }
 
+#[allow(dead_code)]
 struct WSMessages<'a> {
     sock: &'a mut WebSocket
 }
@@ -269,6 +267,7 @@ impl Buffer for WebSocket {
 }
 
 #[bench]
+#[allow(dead_code)]
 fn test_connect(b: &mut Bencher) {
     let url = Url::parse("wss://stream.pushbullet.com/websocket/").unwrap();
     let mut ws = WebSocket::new(url).unwrap();
