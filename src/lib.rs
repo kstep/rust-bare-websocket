@@ -60,21 +60,6 @@ impl Writer for NetworkStream {
 
 static WEBSOCKET_GUID: &'static [u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-fn generate_nonce() -> String {
-    let mut nonce = [0u8, ..10];
-    rand::task_rng().fill_bytes(nonce);
-    nonce.to_base64(base64::STANDARD)
-}
-
-fn encode_nonce(nonce: &str) -> String {
-    let mut sha1 = Sha1::new();
-    let mut result = [0u8, ..20];
-    sha1.input(nonce.as_bytes());
-    sha1.input(WEBSOCKET_GUID);
-    sha1.result(result);
-    result.to_base64(base64::STANDARD)
-}
-
 bitflags! {
     #[deriving(Show)] flags WSHeader: u16 {
         static WS_FIN     = 0b1000000000000000,
@@ -102,6 +87,36 @@ pub struct WebSocket<S = NetworkStream> {
     pub remote_addr: Option<SocketAddr>,
     pub url: Url,
     use_ssl: bool,
+}
+
+struct Nonce(String);
+
+impl Nonce {
+    fn new() -> Nonce {
+        Nonce::generate(&mut rand::task_rng())
+    }
+
+    fn generate(r: &mut Rng) -> Nonce {
+        let mut nonce = [0u8, ..10];
+        r.fill_bytes(nonce);
+        Nonce(nonce.to_base64(base64::STANDARD))
+    }
+
+    fn encode(self) -> Nonce {
+        let n = match self { Nonce(n) => n };
+        let mut sha1 = Sha1::new();
+        let mut result = [0u8, ..20];
+        sha1.input(n.as_bytes());
+        sha1.input(WEBSOCKET_GUID);
+        sha1.result(result);
+        Nonce(result.to_base64(base64::STANDARD))
+    }
+}
+
+impl<'a> Str for Nonce {
+    fn as_slice<'a>(&'a self) -> &'a str {
+        match *self { Nonce(ref n) => n.as_slice() }
+    }
 }
 
 #[allow(dead_code)]
@@ -191,11 +206,13 @@ impl WebSocket {
     }
 
     fn handshake(&mut self) -> IoResult<()> {
-        let nonce = generate_nonce();
+        let mut nonce = Nonce::new();
 
-        try!(self.connect()
-             .and_then(|()| self.send_headers(nonce.as_slice()))
-             .and_then(|()| self.read_response(encode_nonce(nonce.as_slice()).as_slice())));
+        try!(self.connect());
+        try!(self.send_headers(nonce.as_slice()));
+
+        nonce = nonce.encode();
+        try!(self.read_response(nonce.as_slice()));
 
         self.handshake_finished = true;
 
