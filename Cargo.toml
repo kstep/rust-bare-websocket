@@ -4,6 +4,10 @@ name = "websocket"
 version = "0.0.1"
 authors = ["Konstantin Stepanov <me@kstep.me>"]
 
+[lib]
+name = "websocket"
+path = "src/websocket/lib.rs"
+
 [dependencies.url]
 git = "https://github.com/servo/rust-url.git"
 

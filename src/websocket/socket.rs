@@ -1,34 +1,23 @@
-#![feature(default_type_params)]
-
-extern crate url;
-extern crate openssl;
-extern crate serialize;
-extern crate "rust-crypto" as crypto;
-
-#[cfg(test)]
-extern crate test;
-
-#[cfg(test)]
-use test::Bencher;
-
-use url::Url;
-use std::io;
-use std::io::{Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
 use std::io::net::tcp::TcpStream;
 use std::io::net::ip::{SocketAddr, Ipv4Addr};
 use std::io::net::get_host_addresses;
-use std::rand::Rng;
-use std::rand;
+use std::io::{Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
+use std::io;
 use std::collections::TreeMap;
-use serialize::base64::ToBase64;
-use serialize::base64;
-use serialize::json::{Json, ToJson};
-use crypto::sha1::Sha1;
-use crypto::digest::Digest;
+use url::Url;
 use openssl::ssl;
 use openssl::ssl::{SslStream, SslContext};
 
-enum NetworkStream {
+#[cfg(test)]
+use test::Bencher;
+#[cfg(test)]
+use serialize::json::ToJson;
+
+use nonce::Nonce;
+use message::{WSMessage, WSHeader, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64};
+
+
+pub enum NetworkStream {
     NormalStream(TcpStream),
     SslProtectedStream(SslStream<TcpStream>)
 }
@@ -58,75 +47,16 @@ impl Writer for NetworkStream {
     }
 }
 
-static WEBSOCKET_GUID: &'static [u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-
-bitflags! {
-    #[deriving(Show)] flags WSHeader: u16 {
-        // Main structure, mask with & to get header parts
-        static WS_FIN     = 0b1000000000000000, // final flag
-        static WS_RSV     = 0b0111000000000000, // reserved
-        static WS_OPCODE  = 0b0000111100000000, // opcode
-        static WS_MASK    = 0b0000000010000000, // mask flag
-        static WS_LEN     = 0b0000000001111111, // length
-
-        // Opcodes, check for equality after masking with WS_OPCODE
-        static WS_OPCONT  = 0b0000000000000000,
-        static WS_OPTEXT  = 0b0000000100000000,
-        static WS_OPBIN   = 0b0000001000000000,
-        static WS_OPTERM  = 0b0000100000000000,
-        static WS_OPPING  = 0b0000100100000000,
-        static WS_OPPONG  = 0b0000101000000000,
-
-        // Helper masks
-        static WS_OPCTRL  = 0b0000100000000000, // if matches with &, this is a control code
-        static WS_LEN16   = 0b0000000001111110, // if &WS_LEN equals this, it has 16-bit length
-        static WS_LEN64   = 0b0000000001111111, // if &WS_LEN equals this, it has 32-bit length
-    }
-}
-
-#[allow(visible_private_types)]
-#[allow(dead_code)]
 pub struct WebSocket<S = NetworkStream> {
     stream: Option<BufferedStream<S>>,
-    handshake_finished: bool,
+    connected: bool,
     pub remote_addr: Option<SocketAddr>,
     pub url: Url,
     use_ssl: bool,
 }
 
-struct Nonce(String);
-
-impl Nonce {
-    fn new() -> Nonce {
-        Nonce::generate(&mut rand::task_rng())
-    }
-
-    fn generate(r: &mut Rng) -> Nonce {
-        let mut nonce = [0u8, ..10];
-        r.fill_bytes(nonce);
-        Nonce(nonce.to_base64(base64::STANDARD))
-    }
-
-    fn encode(self) -> Nonce {
-        let n = match self { Nonce(n) => n };
-        let mut sha1 = Sha1::new();
-        let mut result = [0u8, ..20];
-        sha1.input(n.as_bytes());
-        sha1.input(WEBSOCKET_GUID);
-        sha1.result(result);
-        Nonce(result.to_base64(base64::STANDARD))
-    }
-}
-
-impl<'a> Str for Nonce {
-    fn as_slice<'a>(&'a self) -> &'a str {
-        match *self { Nonce(ref n) => n.as_slice() }
-    }
-}
-
-#[allow(dead_code)]
 impl WebSocket {
-    fn new(url: Url) -> IoResult<WebSocket> {
+    pub fn new(url: Url) -> IoResult<WebSocket> {
         let addr = match try!(url.domain()
             .map(|h| get_host_addresses(h)
                  .map(|v| v.move_iter().find(|&a| {
@@ -150,7 +80,7 @@ impl WebSocket {
 
         Ok(WebSocket {
             stream: None,
-            handshake_finished: false,
+            connected: false,
             remote_addr: Some(SocketAddr{ ip: addr, port: port }),
             url: url,
             use_ssl: use_ssl,
@@ -158,7 +88,7 @@ impl WebSocket {
     }
 
     #[allow(unused_variable)]
-    fn connect(&mut self) -> IoResult<()> {
+    fn try_connect(&mut self) -> IoResult<()> {
         let s = try!(self.remote_addr.map(|ref a| TcpStream::connect(format!("{}", a.ip).as_slice(), a.port)).unwrap_or_else(|| Err(standard_error(io::InvalidInput))));
         self.stream = Some(BufferedStream::new(
             if self.use_ssl {
@@ -210,34 +140,33 @@ impl WebSocket {
         Ok(())
     }
 
-    fn handshake(&mut self) -> IoResult<()> {
+    pub fn connect(&mut self) -> IoResult<()> {
         let mut nonce = Nonce::new();
 
-        try!(self.connect());
+        try!(self.try_connect());
         try!(self.send_headers(nonce.as_slice()));
 
         nonce = nonce.encode();
         try!(self.read_response(nonce.as_slice()));
 
-        self.handshake_finished = true;
+        self.connected = true;
 
         Ok(())
     }
 
     fn read_header(&mut self) -> IoResult<WSHeader> {
         // XXX: this is a bug, WSHeader should accept u16
-        Ok(WSHeader { bits: try!(self.read_be_u16()) as u32 })
+        Ok(WSHeader::from_bits_truncate(try!(self.read_be_u16()) as u32))
     }
 
     fn read_length(&mut self, header: &WSHeader) -> IoResult<uint> {
-        match header & WS_LEN {
-            WS_LEN16 => self.read_be_u16().map(|v| v as uint),
-            WS_LEN64 => self.read_be_u64().map(|v| v as uint),
-            len => Ok(len.bits as uint)
-        }
+        let wslen = header & WS_LEN;
+        if wslen == WS_LEN16 { self.read_be_u16().map(|v| v as uint) }
+        else if wslen == WS_LEN64 { self.read_be_u64().map(|v| v as uint) }
+        else { Ok(wslen.bits() as uint) }
     }
 
-    fn read_message(&mut self) -> IoResult<WSMessage> {
+    pub fn read_message(&mut self) -> IoResult<WSMessage> {
         let header = try!(self.read_header());
         let len = try!(self.read_length(&header));
 
@@ -256,37 +185,8 @@ impl WebSocket {
 
     // TODO: send_message(&mut self, &WSMessage) -> IoResult<()>
 
-    fn iter(&mut self) -> WSMessages {
+    pub fn iter(&mut self) -> WSMessages {
         WSMessages { sock: self }
-    }
-}
-
-#[deriving(Show)]
-struct WSMessage {
-    header: WSHeader,
-    data: Vec<u8>
-}
-
-impl WSMessage {
-    fn to_string(&self) -> String {
-        String::from_utf8_lossy(self.data.as_slice()).into_string()
-    }
-}
-
-impl ToJson for WSMessage {
-    fn to_json(&self) -> Json {
-        from_str::<Json>(self.to_string().as_slice()).unwrap()
-    }
-}
-
-#[allow(dead_code)]
-struct WSMessages<'a> {
-    sock: &'a mut WebSocket
-}
-
-impl<'a> Iterator<WSMessage> for WSMessages<'a> {
-    fn next(&mut self) -> Option<WSMessage> {
-        self.sock.read_message().ok()
     }
 }
 
@@ -294,6 +194,22 @@ impl Reader for WebSocket {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
         match self.stream {
             Some(ref mut s) => s.read(buf),
+            None => Err(standard_error(io::NotConnected))
+        }
+    }
+}
+
+impl Writer for WebSocket {
+    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+        match self.stream {
+            Some(ref mut s) => s.write(buf),
+            None => Err(standard_error(io::NotConnected))
+        }
+    }
+
+    fn flush(&mut self) -> IoResult<()> {
+        match self.stream {
+            Some(ref mut s) => s.flush(),
             None => Err(standard_error(io::NotConnected))
         }
     }
@@ -315,13 +231,24 @@ impl Buffer for WebSocket {
     }
 }
 
+pub struct WSMessages<'a> {
+    sock: &'a mut WebSocket
+}
+
+impl<'a> Iterator<WSMessage> for WSMessages<'a> {
+    fn next(&mut self) -> Option<WSMessage> {
+        self.sock.read_message().ok()
+    }
+}
+
+
 #[bench]
 #[allow(dead_code)]
 fn test_connect(b: &mut Bencher) {
     let url = Url::parse("wss://stream.pushbullet.com/websocket/").unwrap();
     let mut ws = WebSocket::new(url).unwrap();
 
-    match ws.handshake() {
+    match ws.connect() {
         Err(e) => fail!("error: {}", e),
         _ => ()
     }
