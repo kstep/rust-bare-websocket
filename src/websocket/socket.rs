@@ -200,9 +200,62 @@ pub struct WSMessages<'a> {
     sock: &'a mut WebSocket
 }
 
+pub struct WSDefragMessages<'a> {
+    underlying: &'a mut WSMessages<'a>,
+    buffer: WSMessage
+}
+
+impl<'a> WSMessages<'a> {
+    pub fn defrag(&'a mut self) -> WSDefragMessages<'a> {
+        WSDefragMessages{ underlying: self, buffer: WSMessage{ header: WSHeader.empty(), data: Vec::new() } }
+    }
+}
+
 impl<'a> Iterator<WSMessage> for WSMessages<'a> {
     fn next(&mut self) -> Option<WSMessage> {
         self.sock.read_message().ok()
+    }
+}
+
+impl<'a> WSDefragMessages<'a> {
+    fn popbuf(&mut self) -> Option<WSMessage> {
+        if self.buffer.data.is_empty() {
+            None
+        } else {
+            let buf = WSMessage{ header: WSHeader.empty(), data: Vec::new() };
+            mem::swap(self.buffer, &mut buf);
+            Some(buf)
+        }
+    }
+
+    fn swapbuf(&mut self, msg: &mut WSMessage) -> WSMessage {
+        mem::swap(self.buffer, msg);
+        return msg;
+    }
+}
+
+impl<'a> Iterator<WSMessage> for WSDefragMessages<'a> {
+    fn next(&mut self) -> Option<WSMessage> {
+        loop {
+            match self.underlying.next() {
+                None => return self.popbuf(),
+                Some(msg) => if msg.header.contains(WS_FIN) {
+                    if msg.header & WS_OPCODE == WS_OPCONT {
+                        self.buffer.push(msg);
+                        return self.popbuf();
+                    } else {
+                        return Some(msg);
+                    }
+
+                } else {
+                    if msg.header & WS_OPCODE == WS_OPCONT {
+                        self.buffer.push(msg);
+                    } else {
+                        return self.swapbuf(&mut msg);
+                    }
+                }
+            }
+        }
     }
 }
 
