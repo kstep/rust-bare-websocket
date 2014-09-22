@@ -100,17 +100,20 @@ impl WebSocket {
         Ok(())
     }
 
-    fn send_headers(&mut self, nonce: &str) -> IoResult<()> {
+    fn write_request(&mut self, nonce: &str) -> IoResult<()> {
         let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::NotConnected)) };
+
         try!(s.write(format!("GET {} HTTP/1.1\r\n", self.url.serialize_path().unwrap_or("/".to_string())).as_bytes()));
         try!(s.write(format!("Host: {}\r\n", self.url.host().unwrap()).as_bytes()));
-        try!(s.write("Upgrade: websocket\r\n".as_bytes()));
-        try!(s.write("Connection: Upgrade\r\n".as_bytes()));
         try!(s.write(format!("Origin: {}\r\n", self.url.serialize_no_fragment()).as_bytes()));
-        try!(s.write("Sec-WebSocket-Protocol: char, superchat\r\n".as_bytes()));
-        try!(s.write("Sec-WebSocket-Version: 13\r\n".as_bytes()));
         try!(s.write(format!("Sec-WebSocket-Key: {}\r\n", nonce).as_bytes()));
-        try!(s.write("\r\n".as_bytes()));
+
+        try!(s.write(b"Upgrade: websocket\r\n"));
+        try!(s.write(b"Connection: Upgrade\r\n"));
+        try!(s.write(b"Sec-WebSocket-Protocol: char, superchat\r\n"));
+        try!(s.write(b"Sec-WebSocket-Version: 13\r\n"));
+        try!(s.write(b"\r\n"));
+
         s.flush()
     }
 
@@ -144,7 +147,7 @@ impl WebSocket {
         let mut nonce = Nonce::new();
 
         try!(self.try_connect());
-        try!(self.send_headers(nonce.as_slice()));
+        try!(self.write_request(nonce.as_slice()));
 
         nonce = nonce.encode();
         try!(self.read_response(nonce.as_slice()));
