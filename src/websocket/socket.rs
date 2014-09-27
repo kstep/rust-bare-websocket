@@ -3,6 +3,7 @@ use std::io::net::get_host_addresses;
 use std::io::{Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
 use std::io;
 use std::collections::TreeMap;
+use std::mem;
 use url::Url;
 
 #[cfg(test)]
@@ -11,7 +12,7 @@ use test::Bencher;
 use serialize::json::ToJson;
 
 use nonce::Nonce;
-use message::{WSMessage, WSHeader, WS_FIN, WS_OPCTRL, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64};
+use message::{WSMessage, WSHeader, WS_FIN, WS_OPCTRL, WS_OPCODE, WS_OPCONT, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64};
 use stream::NetworkStream;
 
 
@@ -207,7 +208,7 @@ pub struct WSDefragMessages<'a> {
 
 impl<'a> WSMessages<'a> {
     pub fn defrag(&'a mut self) -> WSDefragMessages<'a> {
-        WSDefragMessages{ underlying: self, buffer: WSMessage{ header: WSHeader.empty(), data: Vec::new() } }
+        WSDefragMessages{ underlying: self, buffer: WSMessage{ header: WSHeader::empty(), data: Vec::new() } }
     }
 }
 
@@ -222,14 +223,14 @@ impl<'a> WSDefragMessages<'a> {
         if self.buffer.data.is_empty() {
             None
         } else {
-            let buf = WSMessage{ header: WSHeader.empty(), data: Vec::new() };
-            mem::swap(self.buffer, &mut buf);
+            let buf = WSMessage{ header: WSHeader::empty(), data: Vec::new() };
+            mem::swap(&mut self.buffer, &mut buf);
             Some(buf)
         }
     }
 
-    fn swapbuf(&mut self, msg: &mut WSMessage) -> WSMessage {
-        mem::swap(self.buffer, msg);
+    fn swapbuf<'a>(&mut self, msg: &'a mut WSMessage) -> &'a mut WSMessage {
+        mem::swap(&mut self.buffer, msg);
         return msg;
     }
 }
@@ -241,7 +242,7 @@ impl<'a> Iterator<WSMessage> for WSDefragMessages<'a> {
                 None => return self.popbuf(),
                 Some(msg) => if msg.header.contains(WS_FIN) {
                     if msg.header & WS_OPCODE == WS_OPCONT {
-                        self.buffer.push(msg);
+                        self.buffer.data.append(msg.data.as_slice());
                         return self.popbuf();
                     } else {
                         return Some(msg);
@@ -249,9 +250,10 @@ impl<'a> Iterator<WSMessage> for WSDefragMessages<'a> {
 
                 } else {
                     if msg.header & WS_OPCODE == WS_OPCONT {
-                        self.buffer.push(msg);
+                        self.buffer.data.append(msg.data.as_slice());
                     } else {
-                        return self.swapbuf(&mut msg);
+                        self.swapbuf(&mut msg);
+                        return Some(msg);
                     }
                 }
             }
