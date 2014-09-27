@@ -3,7 +3,6 @@ use std::io::net::get_host_addresses;
 use std::io::{Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
 use std::io;
 use std::collections::TreeMap;
-use std::mem;
 use url::Url;
 
 #[cfg(test)]
@@ -12,7 +11,7 @@ use test::Bencher;
 use serialize::json::ToJson;
 
 use nonce::Nonce;
-use message::{WSMessage, WSHeader, WS_FIN, WS_OPCTRL, WS_OPCODE, WS_OPCONT, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64};
+use message::{WSMessage, WSHeader, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64};
 use stream::NetworkStream;
 
 
@@ -28,7 +27,7 @@ impl WebSocket {
     pub fn new(url: Url) -> IoResult<WebSocket> {
         let addr = match try!(url.domain()
             .map(|h| get_host_addresses(h)
-                 .map(|v| v.move_iter().find(|&a| {
+                 .map(|v| v.into_iter().find(|&a| {
                      match a {
                          Ipv4Addr(..) => true,
                          _ => false

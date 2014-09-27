@@ -1,4 +1,4 @@
-use std::io::{Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
+use std::io::{Reader, Writer, IoResult, standard_error};
 use std::io::net::tcp::TcpStream;
 use std::io;
 use openssl::ssl;
@@ -14,8 +14,8 @@ impl NetworkStream {
         let sock = try!(TcpStream::connect(ipaddr, port));
 
         if use_ssl {
-            let ctx = try!(SslContext::new(ssl::Sslv23).map_err(|e| standard_error(io::OtherIoError)));
-            Ok(SslProtectedStream(try!(SslStream::new(&ctx, sock).map_err(|e| standard_error(io::OtherIoError)))))
+            let ctx = try!(SslContext::new(ssl::Sslv23).map_err(|_| standard_error(io::OtherIoError)));
+            Ok(SslProtectedStream(try!(SslStream::new(&ctx, sock).map_err(|_| standard_error(io::OtherIoError)))))
         } else {
             Ok(NormalStream(sock))
         }
