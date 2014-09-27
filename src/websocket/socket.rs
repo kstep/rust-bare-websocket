@@ -1,12 +1,9 @@
-use std::io::net::tcp::TcpStream;
 use std::io::net::ip::{SocketAddr, Ipv4Addr};
 use std::io::net::get_host_addresses;
 use std::io::{Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
 use std::io;
 use std::collections::TreeMap;
 use url::Url;
-use openssl::ssl;
-use openssl::ssl::{SslStream, SslContext};
 
 #[cfg(test)]
 use test::Bencher;
@@ -15,37 +12,8 @@ use serialize::json::ToJson;
 
 use nonce::Nonce;
 use message::{WSMessage, WSHeader, WS_FIN, WS_OPCTRL, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64};
+use stream::NetworkStream;
 
-
-pub enum NetworkStream {
-    NormalStream(TcpStream),
-    SslProtectedStream(SslStream<TcpStream>)
-}
-
-impl Reader for NetworkStream {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
-        match *self {
-            NormalStream(ref mut s) => s.read(buf),
-            SslProtectedStream(ref mut s) => s.read(buf)
-        }
-    }
-}
-
-impl Writer for NetworkStream {
-    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
-        match *self {
-            NormalStream(ref mut s) => s.write(buf),
-            SslProtectedStream(ref mut s) => s.write(buf)
-        }
-    }
-
-    fn flush(&mut self) -> IoResult<()> {
-        match *self {
-            NormalStream(ref mut s) => s.flush(),
-            SslProtectedStream(ref mut s) => s.flush()
-        }
-    }
-}
 
 pub struct WebSocket<S = NetworkStream> {
     stream: Option<BufferedStream<S>>,
@@ -89,14 +57,8 @@ impl WebSocket {
 
     #[allow(unused_variable)]
     fn try_connect(&mut self) -> IoResult<()> {
-        let s = try!(self.remote_addr.map(|ref a| TcpStream::connect(format!("{}", a.ip).as_slice(), a.port)).unwrap_or_else(|| Err(standard_error(io::InvalidInput))));
-        self.stream = Some(BufferedStream::new(
-            if self.use_ssl {
-                SslProtectedStream(try!(SslStream::new(&try!(SslContext::new(ssl::Sslv23).map_err(|e| standard_error(io::OtherIoError))), s)
-                                        .map_err(|e| standard_error(io::OtherIoError))))
-            } else {
-                NormalStream(s)
-            }));
+        self.stream = Some(BufferedStream::new(try!(self.remote_addr.map(|ref a| NetworkStream::connect(format!("{}", a.ip).as_slice(), a.port, self.use_ssl))
+                               .unwrap_or_else(|| Err(standard_error(io::InvalidInput))))));
         Ok(())
     }
 
@@ -159,7 +121,7 @@ impl WebSocket {
 
     fn read_header(&mut self) -> IoResult<WSHeader> {
         // XXX: this is a bug, WSHeader should accept u16
-        Ok(WSHeader::from_bits_truncate(try!(self.read_be_u16()) as u32))
+        Ok(WSHeader::from_bits_truncate(try!(self.read_be_u16())))
     }
 
     fn read_length(&mut self, header: &WSHeader) -> IoResult<uint> {

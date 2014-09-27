@@ -17,5 +17,6 @@ extern crate test;
 
 pub mod nonce;
 pub mod message;
+pub mod stream;
 pub mod socket;
 
