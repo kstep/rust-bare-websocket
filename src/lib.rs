@@ -1,8 +1,3 @@
-#![crate_name = "websocket"]
-
-#![crate_type = "dylib"]
-#![crate_type = "rlib"]
-
 #![feature(default_type_params)]
 #![feature(slicing_syntax)]
 #![feature(associated_types)]

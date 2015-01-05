@@ -6,7 +6,6 @@ authors = ["Konstantin Stepanov <me@kstep.me>"]
 
 [lib]
 name = "websocket"
-path = "src/websocket/lib.rs"
 
 [dependencies]
 url = "*"
