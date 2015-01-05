@@ -261,7 +261,7 @@ impl<'a> Iterator for WSDefragMessages<'a> {
 }
 
 #[bench]
-#[allow(dead_code)]
+#[allow(dead_code, unused_variables)]
 fn test_connect(b: &mut Bencher) {
     let url = Url::parse("wss://stream.pushbullet.com/websocket/").unwrap();
     let mut ws = WebSocket::new(url).unwrap();
