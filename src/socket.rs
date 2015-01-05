@@ -177,11 +177,11 @@ impl WebSocket {
         }
 
         // Encode and send length along with header
-        if len < u16::MAX as uint {
-            hdr = hdr | WSHeader::from_bits_truncate(len as u16);
+        if len < WS_LEN16.bits() as uint {
+            hdr = hdr | WSHeader::from_bits_truncate(len as u16 & WS_LEN.bits());
             try!(self.write_be_u16(hdr.bits()));
 
-        } else if len < u64::MAX as uint {
+        } else if len < u16::MAX as uint {
             hdr = hdr | WS_LEN16;
             try!(self.write_be_u16(hdr.bits()));
             try!(self.write_be_u16(len as u16));
