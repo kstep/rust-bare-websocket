@@ -253,7 +253,7 @@ impl<'a> Iterator for WSDefragMessages<'a> {
                     if msg.header & WS_OPCODE == WS_OPCONT {
                         self.buffer.push(msg);
                     } else {
-                        return self.swapbuf(&mut msg);
+                        return Some(self.swapbuf(&mut msg));
                     }
                 }
             }
