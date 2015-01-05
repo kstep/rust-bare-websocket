@@ -54,7 +54,7 @@ impl WebSocket {
 
         try!(s.write(b"Upgrade: websocket\r\n"));
         try!(s.write(b"Connection: Upgrade\r\n"));
-        try!(s.write(b"Sec-WebSocket-Protocol: char, superchat\r\n"));
+        try!(s.write(b"Sec-WebSocket-Protocol: chat, superchat\r\n"));
         try!(s.write(b"Sec-WebSocket-Version: 13\r\n"));
         try!(s.write(b"\r\n"));
 
