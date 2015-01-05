@@ -1,3 +1,5 @@
+use std::str::FromStr;
+use std::num::{FromPrimitive, ToPrimitive};
 use serialize::json::{Json, ToJson};
 
 bitflags! {
@@ -24,10 +26,105 @@ bitflags! {
     }
 }
 
+// TODO: use this instead of u16
+#[derive(Copy, Show)]
+pub enum WSStatusCode {
+    NoError, // = 1000,
+    GoneAway, // = 1001,
+    ProtocolError, // = 1002,
+    UnsupportedData, // = 1003,
+
+    // RESERVERD = 1004,
+    NoCode, // = 1005, // reserved
+    Aborted, // = 1006, // reserved
+
+    InvalidData, // = 1007,
+    ClientError, // = 1008,
+    TooLargeData, // = 1009,
+    ExtensionMissing, // = 1010,
+    ServerError, // = 1011,
+
+    TlsError, // = 1015 // reserved
+
+    // Also:
+    // 0-999 - cannot be used,
+    // 1000-2999 - reserved for protocol,
+    ProtocolCode(u16),
+    // 3000-3999 - reserved for apps, issued by IANA,
+    ApplicationCode(u16),
+    // 4000-4999 - for private use
+    OtherCode(u16)
+}
+
+impl ToPrimitive for WSStatusCode {
+    fn to_u64(&self) -> Option<u64> {
+        match *self {
+            WSStatusCode::NoError => Some(1000u64),
+            WSStatusCode::GoneAway => Some(1001u64),
+            WSStatusCode::ProtocolError => Some(1002u64),
+            WSStatusCode::UnsupportedData => Some(1003u64),
+
+            WSStatusCode::NoCode => Some(1005u64), // reserved
+            WSStatusCode::Aborted => Some(1006u64), // reserved
+
+            WSStatusCode::InvalidData => Some(1007u64),
+            WSStatusCode::ClientError => Some(1008u64),
+            WSStatusCode::TooLargeData => Some(1009u64),
+            WSStatusCode::ExtensionMissing => Some(1010u64),
+            WSStatusCode::ServerError => Some(1011u64),
+
+            WSStatusCode::TlsError => Some(1015u64), // reserved
+
+            WSStatusCode::ProtocolCode(code) if 1000 <= code && code <= 2999 => Some(code as u64),
+            WSStatusCode::ApplicationCode(code) if 3000 <= code && code <= 3999 => Some(code as u64),
+            WSStatusCode::OtherCode(code) if 4000 <= code && code <= 4999 => Some(code as u64),
+            _ => None
+        }
+    }
+    fn to_i64(&self) -> Option<i64> {
+        self.to_u64().map(|v| v as i64)
+    }
+}
+
+impl FromPrimitive for WSStatusCode {
+    fn from_u64(n: u64) -> Option<WSStatusCode> {
+        match n {
+            1000u64 => Some(WSStatusCode::NoError),
+            1001u64 => Some(WSStatusCode::GoneAway),
+            1002u64 => Some(WSStatusCode::ProtocolError),
+            1003u64 => Some(WSStatusCode::UnsupportedData),
+
+            1005u64 => Some(WSStatusCode::NoCode), // reserved
+            1006u64 => Some(WSStatusCode::Aborted), // reserved
+
+            1007u64 => Some(WSStatusCode::InvalidData),
+            1008u64 => Some(WSStatusCode::ClientError),
+            1009u64 => Some(WSStatusCode::TooLargeData),
+            1010u64 => Some(WSStatusCode::ExtensionMissing),
+            1011u64 => Some(WSStatusCode::ServerError),
+
+            1015u64 => Some(WSStatusCode::TlsError), // reserved
+
+            code if 1000 <= code && code <= 2999 => Some(WSStatusCode::ProtocolCode(code as u16)),
+            code if 3000 <= code && code <= 3999 => Some(WSStatusCode::ApplicationCode(code as u16)),
+            code if 4000 <= code && code <= 4999 => Some(WSStatusCode::OtherCode(code as u16)),
+            _ => None
+        }
+    }
+    fn from_i64(n: i64) -> Option<WSStatusCode> {
+        if n < 0i64 {
+            None
+        } else {
+            FromPrimitive::from_u64(n as u64)
+        }
+    }
+}
+
 #[derive(Show)]
 pub struct WSMessage {
     pub header: WSHeader,
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
+    pub status: Option<WSStatusCode>
 }
 
 impl WSMessage {
@@ -38,6 +135,42 @@ impl WSMessage {
     pub fn push(&mut self, msg: WSMessage) {
         self.data.push_all(msg.data[]);
     }
+
+    pub fn text(data: &str) -> WSMessage {
+        WSMessage {
+            header: WS_FIN | WS_OPTEXT,
+            data: data.as_bytes().to_vec(),
+            status: None
+        }
+    }
+
+    pub fn binary(data: &[u8]) -> WSMessage {
+        WSMessage {
+            header: WS_FIN | WS_OPBIN,
+            data: data.to_vec(),
+            status: None
+        }
+    }
+
+    pub fn masked(&mut self, enabled: bool) {
+        if enabled {
+            self.header.insert(WS_MASK);
+        } else {
+            self.header.remove(WS_MASK);
+        }
+    }
+
+    pub fn is_masked(&self) -> bool {
+        self.header.contains(WS_MASK)
+    }
+
+    pub fn close(status: WSStatusCode, data: &str) -> WSMessage {
+        WSMessage {
+            header: WS_FIN | WS_OPTERM,
+            data: data.as_bytes().to_vec(),
+            status: Some(status)
+        }
+    }
 }
 
 impl ToJson for WSMessage {
@@ -46,3 +179,8 @@ impl ToJson for WSMessage {
     }
 }
 
+impl FromStr for WSMessage {
+    #[inline] fn from_str(s: &str) -> Option<WSMessage> {
+        Some(WSMessage::text(s))
+    }
+}
