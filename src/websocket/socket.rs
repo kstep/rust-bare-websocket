@@ -10,7 +10,7 @@ use url::Url;
 use test::Bencher;
 
 use nonce::Nonce;
-use message::{WSMessage, WSHeader, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64, WS_OPCONT, WS_OPCODE, WS_OPTERM, WS_FIN};
+use message::{WSMessage, WSHeader, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64, WS_OPTERM};
 use stream::NetworkStream;
 
 
@@ -291,8 +291,8 @@ impl<'a> Iterator for WSDefragMessages<'a> {
         loop {
             match self.underlying.next() {
                 None => return self.popbuf(),
-                Some(mut msg) => if msg.header.contains(WS_FIN) {
-                    if msg.header & WS_OPCODE == WS_OPCONT {
+                Some(mut msg) => if msg.is_final() {
+                    if msg.is_cont() {
                         self.buffer.push(msg);
                         return self.popbuf();
                     } else {
@@ -300,7 +300,7 @@ impl<'a> Iterator for WSDefragMessages<'a> {
                     }
 
                 } else {
-                    if msg.header & WS_OPCODE == WS_OPCONT {
+                    if msg.is_cont() {
                         self.buffer.push(msg);
                     } else {
                         self.swapbuf(&mut msg);
