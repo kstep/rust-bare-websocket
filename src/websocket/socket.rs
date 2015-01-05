@@ -266,7 +266,7 @@ fn test_connect(b: &mut Bencher) {
     let mut ws = WebSocket::new(url).unwrap();
 
     match ws.connect() {
-        Err(e) => fail!("error: {}", e),
+        Err(e) => panic!("error: {}", e),
         _ => ()
     }
     let msg = ws.read_message().unwrap();

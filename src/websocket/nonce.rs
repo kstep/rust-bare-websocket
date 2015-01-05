@@ -7,7 +7,7 @@ use crypto::digest::Digest;
 
 static WEBSOCKET_GUID: &'static [u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-#[deriving(Show, PartialEq)]
+#[derive(Show, PartialEq)]
 pub struct Nonce(String);
 
 impl Nonce {

@@ -1,7 +1,7 @@
 use serialize::json::{Json, ToJson};
 
 bitflags! {
-    #[deriving(Show)] flags WSHeader: u16 {
+    #[derive(Show)] flags WSHeader: u16 {
         // Main structure, mask with & to get header parts
         const WS_FIN     = 0b1000000000000000, // final flag
         const WS_RSV     = 0b0111000000000000, // reserved
@@ -24,7 +24,7 @@ bitflags! {
     }
 }
 
-#[deriving(Show)]
+#[derive(Show)]
 pub struct WSMessage {
     pub header: WSHeader,
     pub data: Vec<u8>
