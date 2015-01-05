@@ -313,23 +313,26 @@ impl<'a> Iterator for WSDefragMessages<'a> {
 }
 
 #[bench]
-#[allow(dead_code, unused_variables)]
+#[allow(dead_code, unused_variables, unused_imports)]
 fn test_connect(b: &mut Bencher) {
-    //let url = Url::parse("wss://stream.pushbullet.com/websocket/").unwrap();
+    use message::WSStatusCode;
+    use rustc_serialize::json::ToJson;
+
     let url = Url::parse("ws://echo.websocket.org").unwrap();
     let mut ws = WebSocket::new(url);
     ws.connect().unwrap();
 
-    let msg = WSMessage::text("Hello, World!");
+    let msg = WSMessage::text("Hello, World!"); //.mask();
     b.bytes = msg.data.len() as u64;
 
-    b.auto_bench(|b| {
-        b.iter(|| {
+    //b.bench_n(1, |b| {
+        //b.iter(|| {
+            println!("sent: {} {}", msg, msg.to_string());
             ws.send_message(&msg).unwrap();
-            let msg = ws.read_message().unwrap();
-            //println!("received: {} {}", msg, msg.to_string());
-        })
-    });
+            let reply = ws.read_message().unwrap();
+            println!("received: {} {}", reply, reply.to_string());
+        //})
+    //});
 
     //for msg in ws.iter() {
         //println!("{}", msg.to_string());
