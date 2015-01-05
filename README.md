@@ -19,7 +19,7 @@ And then in your code:
 extern crate url;
 extern crate websocket;
 
-use websocket::socket::WebSocket;
+use websocket::{WebSocket, WSMessage};
 use url::Url;
 ```
 
@@ -57,4 +57,4 @@ for msg in ws.iter() {
 }
 ```
 
-That's pretty much of it, actually.
+That's pretty much all of it, actually.
