@@ -7,8 +7,8 @@ pub enum NetworkStream {
 }
 
 impl NetworkStream {
-    pub fn connect(ipaddr: &str, port: u16, use_ssl: bool) -> IoResult<NetworkStream> {
-        let sock = try!(TcpStream::connect(ipaddr, port));
+    pub fn connect(hostname: &str, use_ssl: bool) -> IoResult<NetworkStream> {
+        let sock = try!(TcpStream::connect(hostname));
 
         if use_ssl {
             let ctx = try!(SslContext::new(SslMethod::Sslv23).map_err(|_| standard_error(io::OtherIoError)));

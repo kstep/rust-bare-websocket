@@ -57,7 +57,7 @@ impl WebSocket {
 
     #[allow(unused_variable)]
     fn try_connect(&mut self) -> IoResult<()> {
-        self.stream = Some(BufferedStream::new(try!(self.remote_addr.map(|ref a| NetworkStream::connect(format!("{}", a.ip)[], a.port, self.use_ssl))
+        self.stream = Some(BufferedStream::new(try!(self.remote_addr.map(|ref a| NetworkStream::connect(format!("{}:{}", a.ip, a.port)[], self.use_ssl))
                                .unwrap_or_else(|| Err(standard_error(io::InvalidInput))))));
         Ok(())
     }
@@ -125,7 +125,7 @@ impl WebSocket {
     }
 
     fn read_length(&mut self, header: &WSHeader) -> IoResult<uint> {
-        let wslen = header & WS_LEN;
+        let wslen = *header & WS_LEN;
         if wslen == WS_LEN16 { self.read_be_u16().map(|v| v as uint) }
         else if wslen == WS_LEN64 { self.read_be_u64().map(|v| v as uint) }
         else { Ok(wslen.bits() as uint) }
@@ -145,7 +145,7 @@ impl WebSocket {
     }
 
     fn unmask_data(data: Vec<u8>, mask: u32) -> Vec<u8> {
-        data.iter().enumerate().map(|(i, b)| b ^ (mask >> ((i % 4) << 3) & 0xff) as u8).collect::<Vec<u8>>()
+        data.iter().enumerate().map(|(i, b)| *b ^ (mask >> ((i % 4) << 3) & 0xff) as u8).collect::<Vec<u8>>()
     }
 
     // TODO: send_message(&mut self, &WSMessage) -> IoResult<()>
@@ -224,13 +224,13 @@ impl<'a> WSDefragMessages<'a> {
             None
         } else {
             let buf = WSMessage{ header: WSHeader::empty(), data: Vec::new() };
-            mem::swap(self.buffer, &mut buf);
+            mem::swap(&mut self.buffer, &mut buf);
             Some(buf)
         }
     }
 
     fn swapbuf(&mut self, msg: &mut WSMessage) -> WSMessage {
-        mem::swap(self.buffer, msg);
+        mem::swap(&mut self.buffer, msg);
         return msg;
     }
 }
