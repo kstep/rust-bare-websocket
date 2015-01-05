@@ -241,6 +241,59 @@ impl WSMessage {
     #[inline] pub fn is_pong(&self) -> bool { self.opcode() == WS_OPPONG }
     #[inline] pub fn is_close(&self) -> bool { self.opcode() == WS_OPTERM }
     #[inline] pub fn is_cont(&self) -> bool { self.opcode() == WS_OPCONT }
+
+    pub fn split(self, maxlen: uint) -> WSFragmentedMessage {
+        WSFragmentedMessage {
+            size: self.data.len() + if self.status.is_none() { 0 } else { 2 },
+            original: self,
+            maxsize: maxlen,
+            pos: 0
+        }
+    }
+}
+
+pub struct WSFragmentedMessage {
+    original: WSMessage,
+    maxsize: uint,
+    pos: uint,
+    size: uint
+}
+
+impl Iterator for WSFragmentedMessage {
+    type Item = WSMessage;
+    fn next(&mut self) -> Option<WSMessage> {
+        if self.size == 0 {
+            None
+        } else if self.size <= self.maxsize { // last
+            self.size = 0;
+            Some(WSMessage {
+                header: self.original.header | WS_FIN,
+                status: self.original.status,
+                data: self.original.data[self.pos..].to_vec()
+            })
+        } else if self.pos == 0 { // first
+            let maxsize = self.maxsize - if self.original.status.is_none() { 0 } else { 2 };
+            let result = Some(WSMessage {
+                header: self.original.header - WS_FIN,
+                status: self.original.status,
+                data: self.original.data[..maxsize].to_vec()
+            });
+            self.original.header.remove(WS_FIN | WS_OPCODE);
+            self.original.status = None;
+            self.pos = maxsize;
+            self.size -= self.maxsize;
+            result
+        } else { // middle
+            let pos = self.pos;
+            self.pos += self.maxsize;
+            self.size -= self.maxsize;
+            Some(WSMessage {
+                header: self.original.header,
+                status: None,
+                data: self.original.data[pos..pos+self.maxsize].to_vec()
+            })
+        }
+    }
 }
 
 impl ToJson for WSMessage {
