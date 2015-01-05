@@ -16,7 +16,7 @@ impl Nonce {
     }
 
     fn generate(r: &mut Rng) -> Nonce {
-        let mut nonce = [0u8, ..10];
+        let mut nonce = [0u8; 10];
         r.fill_bytes(nonce);
         Nonce(nonce.to_base64(base64::STANDARD))
     }
@@ -24,7 +24,7 @@ impl Nonce {
     pub fn encode(self) -> Nonce {
         let n = match self { Nonce(n) => n };
         let mut sha1 = Sha1::new();
-        let mut result = [0u8, ..20];
+        let mut result = [0u8; 20];
         sha1.input(n.as_bytes());
         sha1.input(WEBSOCKET_GUID);
         sha1.result(result);
