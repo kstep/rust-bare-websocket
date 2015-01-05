@@ -229,9 +229,8 @@ impl<'a> WSDefragMessages<'a> {
         }
     }
 
-    fn swapbuf(&mut self, msg: &mut WSMessage) -> WSMessage {
+    fn swapbuf(&mut self, msg: &mut WSMessage) -> () {
         mem::swap(&mut self.buffer, msg);
-        return msg;
     }
 }
 
@@ -253,7 +252,8 @@ impl<'a> Iterator for WSDefragMessages<'a> {
                     if msg.header & WS_OPCODE == WS_OPCONT {
                         self.buffer.push(msg);
                     } else {
-                        return Some(self.swapbuf(&mut msg));
+                        self.swapbuf(&mut msg);
+                        return Some(msg);
                     }
                 }
             }

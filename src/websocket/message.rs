@@ -34,6 +34,10 @@ impl WSMessage {
     pub fn to_string(&self) -> String {
         String::from_utf8_lossy(self.data[]).into_string()
     }
+
+    pub fn push(&mut self, msg: WSMessage) {
+        self.data.push_all(msg.data[]);
+    }
 }
 
 impl ToJson for WSMessage {
