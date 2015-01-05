@@ -10,7 +10,7 @@
 extern crate url;
 extern crate openssl;
 extern crate serialize;
-extern crate "rust-crypto" as crypto;
+extern crate crypto;
 
 #[cfg(test)]
 extern crate test;
