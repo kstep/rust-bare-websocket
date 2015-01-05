@@ -14,7 +14,7 @@ impl Nonce {
         Nonce::generate(&mut rand::thread_rng())
     }
 
-    fn generate(r: &mut Rng) -> Nonce {
+    fn generate<R: Rng>(r: &mut R) -> Nonce {
         let mut nonce = [0u8; 10];
         r.fill_bytes(nonce.as_mut_slice());
         Nonce(nonce.to_base64(base64::STANDARD))
