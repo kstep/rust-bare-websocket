@@ -1,7 +1,5 @@
-use std::rand::Rng;
-use std::rand;
-use serialize::base64::ToBase64;
-use serialize::base64;
+use std::rand::{self, Rng};
+use serialize::base64::{self, ToBase64};
 use crypto::sha1::Sha1;
 use crypto::digest::Digest;
 
@@ -12,7 +10,7 @@ pub struct Nonce(String);
 
 impl Nonce {
     pub fn new() -> Nonce {
-        Nonce::generate(&mut rand::task_rng())
+        Nonce::generate(&mut rand::thread_rng())
     }
 
     fn generate(r: &mut Rng) -> Nonce {
