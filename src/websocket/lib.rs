@@ -7,6 +7,7 @@
 
 #![feature(default_type_params)]
 #![feature(slicing_syntax)]
+#![feature(associated_types)]
 
 extern crate url;
 extern crate openssl;

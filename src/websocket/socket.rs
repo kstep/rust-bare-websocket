@@ -211,7 +211,8 @@ impl<'a> WSMessages<'a> {
     }
 }
 
-impl<'a> Iterator<WSMessage> for WSMessages<'a> {
+impl<'a> Iterator for WSMessages<'a> {
+    type Item = WSMessage;
     fn next(&mut self) -> Option<WSMessage> {
         self.sock.read_message().ok()
     }
@@ -234,7 +235,8 @@ impl<'a> WSDefragMessages<'a> {
     }
 }
 
-impl<'a> Iterator<WSMessage> for WSDefragMessages<'a> {
+impl<'a> Iterator for WSDefragMessages<'a> {
+    type Item = WSMessage;
     fn next(&mut self) -> Option<WSMessage> {
         loop {
             match self.underlying.next() {
