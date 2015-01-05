@@ -123,7 +123,10 @@ impl WebSocket {
             None
         };
 
+        // If this is the terminating frame (close command),
+        // first two bytes of data MUST BE u16 status code
         let mut status = if header.contains(WS_OPTERM) {
+            // compensate length of status code
             len = len - 2;
             Some(try!(self.read_be_u16()))
         } else {
@@ -131,9 +134,13 @@ impl WebSocket {
         };
 
         let mut data = try!(self.read_exact(len));
+
+        // If we have mask, decrypt data
         if let Some(mut m) = mask {
+            // decrypt status if present
             if let Some(s) = status {
                 status = Some(s ^ (m & 0xffff) as u16);
+                // compensate the usage of two mask bytes
                 m = m.rotate_right(16);
             }
             data = WebSocket::mask_data(data[], m);
@@ -150,10 +157,12 @@ impl WebSocket {
         let mut len = msg.data.len();
         let mut hdr = msg.header - WS_LEN;
 
+        // If we have status set, the data length is increased by status size
         if msg.status.is_some() {
             len = len + 2;
         }
 
+        // Encode and send length along with header
         if len < u16::MAX as uint {
             hdr = hdr | WSHeader::from_bits_truncate(len as u16);
             try!(self.write_be_u16(hdr.bits()));
@@ -169,17 +178,22 @@ impl WebSocket {
             try!(self.write_be_u64(len as u64));
         }
 
+        // If user required masking, encrypt all data
         if hdr.contains(WS_MASK) {
+            // Generate and send random mask
             let mut mask = thread_rng().gen::<u32>();
             try!(self.write_be_u32(mask));
 
+            // Encrypt status code if present
             if let Some(status) = msg.status {
                 try!(self.write_be_u16(status.to_u16().unwrap() ^ (mask & 0xffff) as u16));
+                // compensate for mask already used for status encryption
                 mask = mask.rotate_right(16);
             }
 
             try!(self.write(WebSocket::mask_data(msg.data[], mask)[]));
         } else {
+            // Send status code if present
             if let Some(status) = msg.status {
                 try!(self.write_be_u16(status.to_u16().unwrap()));
             }
