@@ -27,7 +27,7 @@ Example code:
 
 ```rust
 // Initialization
-let url = Url::parse("ws://echo.websocket.org").unwrap();
+let url = Url::parse("ws://echo.websocket.org").unwrap(); // <-- also supports SSL, just use "wss://" schema
 let mut ws = WebSocket::new(url);
 ws.connect().unwrap(); // <-- you can pass configured WebSocket somewhere before connecting
 
