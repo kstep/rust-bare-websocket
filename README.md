@@ -39,10 +39,10 @@ let msg1 = WSMessage::text("Hello").first(); // <-- first fragment
 let msg2 = WSMessage::text(", ").more(); // <-- continue fragment
 let msg3 = WSMessage::text("world!").last(); // <-- last fragment
 
-// Send all fragments
-ws.send_message(&msg1).unwrap();
-ws.send_message(&msg2).unwrap();
-ws.send_message(&msg3).unwrap();
+// Or easier: split message by size:
+for m in WSMessage::text("Hello, world!").split(5) { // <-- WSMessage iterator
+    ws.send_message(&m).unwrap();
+}
 
 // Usage of .defrag()menting iterator below (you can get each message fragment by not using it)
 let reply = ws.iter().defrag().next().unwrap();
