@@ -2,13 +2,10 @@ use std::io::{self, Buffer, Reader, Writer, IoResult, BufferedStream, standard_e
 use std::mem;
 use std::collections::BTreeMap;
 use std::rand::{thread_rng, Rng};
-use std::{u64, u16};
+use std::u16;
 use std::num::{Int, FromPrimitive, ToPrimitive};
 use std::slice::SliceConcatExt;
 use url::Url;
-
-#[cfg(test)]
-use test::Bencher;
 
 use nonce::Nonce;
 use message::{WSMessage, WSHeader, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64, WS_OPTERM};
