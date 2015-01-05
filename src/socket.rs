@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::rand::{thread_rng, Rng};
 use std::{u64, u16};
 use std::num::{Int, FromPrimitive, ToPrimitive};
+use std::slice::SliceConcatExt;
 use url::Url;
 
 #[cfg(test)]
@@ -19,10 +20,13 @@ pub struct WebSocket<S = NetworkStream> {
     pub url: Url,
     hostname: String,
     use_ssl: bool,
+    version: uint,
+    extensions: Option<Vec<String>>,
+    protocols: Option<Vec<String>>
 }
 
 impl WebSocket {
-    pub fn new(url: Url) -> WebSocket {
+    pub fn with_options(url: Url, version: uint, protocols: Option<&[&str]>, extensions: Option<&[&str]>) -> WebSocket {
         let use_ssl = url.scheme[] == "wss";
 
         let port = match url.port() {
@@ -36,7 +40,14 @@ impl WebSocket {
             hostname: format!("{}:{}", url.serialize_host().unwrap(), port),
             url: url,
             use_ssl: use_ssl,
+            version: version,
+            extensions: extensions.map(|v| v.iter().map(|v| v.to_string()).collect()),
+            protocols: protocols.map(|v| v.iter().map(|v| v.to_string()).collect())
         }
+    }
+
+    #[inline] pub fn new(url: Url) -> WebSocket {
+        WebSocket::with_options(url, 1, None, None)
     }
 
     fn try_connect(&mut self) -> IoResult<()> {
@@ -54,8 +65,13 @@ impl WebSocket {
 
         try!(s.write(b"Upgrade: websocket\r\n"));
         try!(s.write(b"Connection: Upgrade\r\n"));
-        try!(s.write(b"Sec-WebSocket-Protocol: chat, superchat\r\n"));
-        try!(s.write(b"Sec-WebSocket-Version: 13\r\n"));
+        try!(s.write(format!("Sec-WebSocket-Version: {}\r\n", self.version).as_bytes()));
+        if let Some(ref protos) = self.protocols {
+            try!(s.write(format!("Sec-WebSocket-Protocol: {}\r\n", protos.connect(", ")).as_bytes()));
+        }
+        if let Some(ref exts) = self.extensions {
+            try!(s.write(format!("Sec-WebSocket-Extensions: {}\r\n", exts.connect(", ")).as_bytes()));
+        }
         try!(s.write(b"\r\n"));
 
         s.flush()
