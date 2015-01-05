@@ -3,7 +3,27 @@ rust-websocket
 
 WebSocket implementation in Rust (@rust-lang)
 
-Example:
+To use, add dependency to you Cargo.toml (you will also need url crate):
+
+```
+[dependencies]
+url = "*"
+
+[dependencies.websocket]
+git = https:://github.com/kstep/rust-websocket.git
+```
+
+And then in your code:
+
+```rust
+extern crate url;
+extern crate websocket;
+
+use websocket::socket::WebSocket;
+use url::Url;
+```
+
+Example code:
 
 ```rust
 // Initialization
@@ -36,3 +56,5 @@ for msg in ws.iter() {
     println!("{}", msg.to_string());
 }
 ```
+
+That's pretty much of it, actually.
