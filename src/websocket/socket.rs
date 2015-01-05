@@ -280,7 +280,7 @@ impl<'a> WSDefragMessages<'a> {
         }
     }
 
-    fn swapbuf(&mut self, msg: &mut WSMessage) -> () {
+    fn swapbuf(&mut self, msg: &mut WSMessage) {
         mem::swap(&mut self.buffer, msg);
     }
 }
@@ -291,20 +291,16 @@ impl<'a> Iterator for WSDefragMessages<'a> {
         loop {
             match self.underlying.next() {
                 None => return self.popbuf(),
-                Some(mut msg) => if msg.is_final() {
-                    if msg.is_cont() {
-                        self.buffer.push(msg);
-                        return self.popbuf();
-                    } else {
+                Some(mut msg) => {
+                    if msg.is_whole() {
                         return Some(msg);
-                    }
-
-                } else {
-                    if msg.is_cont() {
-                        self.buffer.push(msg);
-                    } else {
+                    } else if msg.is_first() {
                         self.swapbuf(&mut msg);
-                        return Some(msg);
+                    } else if msg.is_more() {
+                        self.buffer.push(msg);
+                    } else if msg.is_last() {
+                        self.buffer.push(msg);
+                        return self.popbuf().map(|v| v.last());
                     }
                 }
             }
@@ -325,11 +321,17 @@ fn test_connect(b: &mut Bencher) {
     let msg = WSMessage::text("Hello, World!"); //.mask();
     b.bytes = msg.data.len() as u64;
 
+    let msg1 = WSMessage::text("Hello,").first();
+    let msg2 = WSMessage::text(" world!").last();
+
     //b.bench_n(1, |b| {
         //b.iter(|| {
-            println!("sent: {} {}", msg, msg.to_string());
-            ws.send_message(&msg).unwrap();
-            let reply = ws.read_message().unwrap();
+            println!("sent: {} {}", msg1, msg1.to_string());
+            ws.send_message(&msg1).unwrap();
+            println!("sent: {} {}", msg2, msg2.to_string());
+            ws.send_message(&msg2).unwrap();
+
+            let reply = ws.iter().defrag().next().unwrap();
             println!("received: {} {}", reply, reply.to_string());
         //})
     //});
