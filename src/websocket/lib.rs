@@ -1,7 +1,5 @@
 #![crate_name = "websocket"]
 
-#![comment = "WebSocket client"]
-#![license = "MIT/ASL2"]
 #![crate_type = "dylib"]
 #![crate_type = "rlib"]
 

@@ -32,7 +32,7 @@ pub struct WSMessage {
 
 impl WSMessage {
     pub fn to_string(&self) -> String {
-        String::from_utf8_lossy(self.data[]).into_string()
+        String::from_utf8_lossy(self.data[]).into_owned()
     }
 
     pub fn push(&mut self, msg: WSMessage) {

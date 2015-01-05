@@ -55,7 +55,6 @@ impl WebSocket {
         })
     }
 
-    #[allow(unused_variable)]
     fn try_connect(&mut self) -> IoResult<()> {
         self.stream = Some(BufferedStream::new(try!(self.remote_addr.map(|ref a| NetworkStream::connect(format!("{}:{}", a.ip, a.port)[], self.use_ssl))
                                .unwrap_or_else(|| Err(standard_error(io::InvalidInput))))));
@@ -90,13 +89,13 @@ impl WebSocket {
         }
 
         let headers = s.lines().map(|r| r.unwrap_or("\r\n".to_string())) .take_while(|l| l[] != "\r\n")
-            .map(|s| s[].splitn(1, ':').map(|s| s.trim_chars(spaces).to_string()).collect::<Vec<String>>())
+            .map(|s| s[].splitn(1, ':').map(|s| s.trim_matches(spaces).to_string()).collect::<Vec<String>>())
             .map(|p| (p[0].to_string(), p[1].to_string()))
             .collect::<BTreeMap<String, String>>();
 
         try!(s.flush());
 
-        let response = headers.find(&"Sec-WebSocket-Accept".to_string());
+        let response = headers.get("Sec-WebSocket-Accept");
         match response {
             Some(r) if nonce == r[] => (),
             _ => return Err(standard_error(io::InvalidInput))
