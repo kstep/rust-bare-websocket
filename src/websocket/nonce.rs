@@ -1,6 +1,6 @@
 use std::rand::{self, Rng};
 use std::ops::Slice;
-use serialize::base64::{self, ToBase64};
+use rustc_serialize::base64::{self, ToBase64};
 use crypto::sha1::Sha1;
 use crypto::digest::Digest;
 

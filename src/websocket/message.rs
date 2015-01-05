@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use std::num::{FromPrimitive, ToPrimitive};
-use serialize::json::{Json, ToJson};
+use rustc_serialize::json::{Json, ToJson};
 
 bitflags! {
     #[derive(Show)] flags WSHeader: u16 {

@@ -8,8 +8,6 @@ use url::Url;
 
 #[cfg(test)]
 use test::Bencher;
-#[cfg(test)]
-use serialize::json::ToJson;
 
 use nonce::Nonce;
 use message::{WSMessage, WSHeader, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64, WS_OPCONT, WS_OPCODE, WS_OPTERM, WS_FIN};
