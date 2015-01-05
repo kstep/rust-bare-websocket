@@ -6,6 +6,7 @@
 #![crate_type = "rlib"]
 
 #![feature(default_type_params)]
+#![feature(slicing_syntax)]
 
 extern crate url;
 extern crate openssl;

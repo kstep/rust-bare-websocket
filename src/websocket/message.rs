@@ -32,13 +32,13 @@ pub struct WSMessage {
 
 impl WSMessage {
     pub fn to_string(&self) -> String {
-        String::from_utf8_lossy(self.data.as_slice()).into_string()
+        String::from_utf8_lossy(self.data[]).into_string()
     }
 }
 
 impl ToJson for WSMessage {
     fn to_json(&self) -> Json {
-        from_str::<Json>(self.to_string().as_slice()).unwrap()
+        self.to_string()[].parse::<Json>().unwrap()
     }
 }
 

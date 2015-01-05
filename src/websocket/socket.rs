@@ -1,7 +1,7 @@
 use std::io::net::ip::{SocketAddr, Ipv4Addr};
 use std::io::net::get_host_addresses;
-use std::io::{Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
-use std::io;
+use std::io::{self, Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
+use std::mem;
 use std::collections::BTreeMap;
 use url::Url;
 
@@ -11,7 +11,7 @@ use test::Bencher;
 use serialize::json::ToJson;
 
 use nonce::Nonce;
-use message::{WSMessage, WSHeader, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64};
+use message::{WSMessage, WSHeader, WS_MASK, WS_LEN, WS_LEN16, WS_LEN64, WS_OPCONT, WS_OPCODE, WS_FIN};
 use stream::NetworkStream;
 
 
@@ -38,7 +38,7 @@ impl WebSocket {
                 None => return Err(standard_error(io::FileNotFound))
             };
 
-        let use_ssl = url.scheme.as_slice() == "wss";
+        let use_ssl = url.scheme[] == "wss";
 
         let port = match url.port() {
             Some(p) => p,
@@ -57,7 +57,7 @@ impl WebSocket {
 
     #[allow(unused_variable)]
     fn try_connect(&mut self) -> IoResult<()> {
-        self.stream = Some(BufferedStream::new(try!(self.remote_addr.map(|ref a| NetworkStream::connect(format!("{}", a.ip).as_slice(), a.port, self.use_ssl))
+        self.stream = Some(BufferedStream::new(try!(self.remote_addr.map(|ref a| NetworkStream::connect(format!("{}", a.ip)[], a.port, self.use_ssl))
                                .unwrap_or_else(|| Err(standard_error(io::InvalidInput))))));
         Ok(())
     }
@@ -82,15 +82,15 @@ impl WebSocket {
     fn read_response(&mut self, nonce: &str) -> IoResult<()> {
         let spaces: &[_] = &[' ', '\t', '\r', '\n'];
         let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::NotConnected)) };
-        let status = try!(s.read_line()).as_slice().splitn(2, ' ').nth(1).and_then(|s| from_str::<uint>(s));
+        let status = try!(s.read_line())[].splitn(2, ' ').nth(1).and_then(|s| s.parse::<uint>());
 
         match status {
             Some(101) => (),
             _ => return Err(standard_error(io::InvalidInput))
         }
 
-        let headers = s.lines().map(|r| r.unwrap_or("\r\n".to_string())) .take_while(|l| l.as_slice() != "\r\n")
-            .map(|s| s.as_slice().splitn(1, ':').map(|s| s.trim_chars(spaces).to_string()).collect::<Vec<String>>())
+        let headers = s.lines().map(|r| r.unwrap_or("\r\n".to_string())) .take_while(|l| l[] != "\r\n")
+            .map(|s| s[].splitn(1, ':').map(|s| s.trim_chars(spaces).to_string()).collect::<Vec<String>>())
             .map(|p| (p[0].to_string(), p[1].to_string()))
             .collect::<BTreeMap<String, String>>();
 
@@ -98,7 +98,7 @@ impl WebSocket {
 
         let response = headers.find(&"Sec-WebSocket-Accept".to_string());
         match response {
-            Some(r) if nonce == r.as_slice() => (),
+            Some(r) if nonce == r[] => (),
             _ => return Err(standard_error(io::InvalidInput))
         }
 
@@ -109,10 +109,10 @@ impl WebSocket {
         let mut nonce = Nonce::new();
 
         try!(self.try_connect());
-        try!(self.write_request(nonce.as_slice()));
+        try!(self.write_request(nonce[]));
 
         nonce = nonce.encode();
-        try!(self.read_response(nonce.as_slice()));
+        try!(self.read_response(nonce[]));
 
         self.connected = true;
 
@@ -207,7 +207,7 @@ pub struct WSDefragMessages<'a> {
 
 impl<'a> WSMessages<'a> {
     pub fn defrag(&'a mut self) -> WSDefragMessages<'a> {
-        WSDefragMessages{ underlying: self, buffer: WSMessage{ header: WSHeader.empty(), data: Vec::new() } }
+        WSDefragMessages{ underlying: self, buffer: WSMessage{ header: WSHeader::empty(), data: Vec::new() } }
     }
 }
 
@@ -222,7 +222,7 @@ impl<'a> WSDefragMessages<'a> {
         if self.buffer.data.is_empty() {
             None
         } else {
-            let buf = WSMessage{ header: WSHeader.empty(), data: Vec::new() };
+            let buf = WSMessage{ header: WSHeader::empty(), data: Vec::new() };
             mem::swap(self.buffer, &mut buf);
             Some(buf)
         }

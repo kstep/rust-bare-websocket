@@ -34,6 +34,6 @@ impl Nonce {
 
 impl<'a> Str for Nonce {
     fn as_slice<'a>(&'a self) -> &'a str {
-        match *self { Nonce(ref n) => n.as_slice() }
+        match *self { Nonce(ref n) => n[] }
     }
 }
