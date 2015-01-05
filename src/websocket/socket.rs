@@ -223,7 +223,7 @@ impl<'a> WSDefragMessages<'a> {
         if self.buffer.data.is_empty() {
             None
         } else {
-            let buf = WSMessage{ header: WSHeader::empty(), data: Vec::new() };
+            let mut buf = WSMessage{ header: WSHeader::empty(), data: Vec::new() };
             mem::swap(&mut self.buffer, &mut buf);
             Some(buf)
         }
@@ -240,7 +240,7 @@ impl<'a> Iterator for WSDefragMessages<'a> {
         loop {
             match self.underlying.next() {
                 None => return self.popbuf(),
-                Some(msg) => if msg.header.contains(WS_FIN) {
+                Some(mut msg) => if msg.header.contains(WS_FIN) {
                     if msg.header & WS_OPCODE == WS_OPCONT {
                         self.buffer.push(msg);
                         return self.popbuf();
