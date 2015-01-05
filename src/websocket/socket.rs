@@ -2,7 +2,7 @@ use std::io::net::ip::{SocketAddr, Ipv4Addr};
 use std::io::net::get_host_addresses;
 use std::io::{Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
 use std::io;
-use std::collections::TreeMap;
+use std::collections::BTreeMap;
 use url::Url;
 
 #[cfg(test)]
@@ -92,7 +92,7 @@ impl WebSocket {
         let headers = s.lines().map(|r| r.unwrap_or("\r\n".to_string())) .take_while(|l| l.as_slice() != "\r\n")
             .map(|s| s.as_slice().splitn(1, ':').map(|s| s.trim_chars(spaces).to_string()).collect::<Vec<String>>())
             .map(|p| (p[0].to_string(), p[1].to_string()))
-            .collect::<TreeMap<String, String>>();
+            .collect::<BTreeMap<String, String>>();
 
         try!(s.flush());
 
