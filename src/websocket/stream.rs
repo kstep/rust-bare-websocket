@@ -1,12 +1,9 @@
-use std::io::{Reader, Writer, IoResult, standard_error};
-use std::io::net::tcp::TcpStream;
-use std::io;
-use openssl::ssl;
-use openssl::ssl::{SslStream, SslContext};
+use std::io::{self, Reader, Writer, IoResult, standard_error, TcpStream};
+use openssl::ssl::{SslMethod, SslStream, SslContext};
 
 pub enum NetworkStream {
-    NormalStream(TcpStream),
-    SslProtectedStream(SslStream<TcpStream>)
+    Tcp(TcpStream),
+    Ssl(SslStream<TcpStream>)
 }
 
 impl NetworkStream {
@@ -14,10 +11,10 @@ impl NetworkStream {
         let sock = try!(TcpStream::connect(ipaddr, port));
 
         if use_ssl {
-            let ctx = try!(SslContext::new(ssl::Sslv23).map_err(|_| standard_error(io::OtherIoError)));
-            Ok(SslProtectedStream(try!(SslStream::new(&ctx, sock).map_err(|_| standard_error(io::OtherIoError)))))
+            let ctx = try!(SslContext::new(SslMethod::Sslv23).map_err(|_| standard_error(io::OtherIoError)));
+            Ok(NetworkStream::Ssl(try!(SslStream::new(&ctx, sock).map_err(|_| standard_error(io::OtherIoError)))))
         } else {
-            Ok(NormalStream(sock))
+            Ok(NetworkStream::Tcp(sock))
         }
     }
 }
@@ -25,8 +22,8 @@ impl NetworkStream {
 impl Reader for NetworkStream {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
         match *self {
-            NormalStream(ref mut s) => s.read(buf),
-            SslProtectedStream(ref mut s) => s.read(buf)
+            NetworkStream::Tcp(ref mut s) => s.read(buf),
+            NetworkStream::Ssl(ref mut s) => s.read(buf)
         }
     }
 }
@@ -34,15 +31,15 @@ impl Reader for NetworkStream {
 impl Writer for NetworkStream {
     fn write(&mut self, buf: &[u8]) -> IoResult<()> {
         match *self {
-            NormalStream(ref mut s) => s.write(buf),
-            SslProtectedStream(ref mut s) => s.write(buf)
+            NetworkStream::Tcp(ref mut s) => s.write(buf),
+            NetworkStream::Ssl(ref mut s) => s.write(buf)
         }
     }
 
     fn flush(&mut self) -> IoResult<()> {
         match *self {
-            NormalStream(ref mut s) => s.flush(),
-            SslProtectedStream(ref mut s) => s.flush()
+            NetworkStream::Tcp(ref mut s) => s.flush(),
+            NetworkStream::Ssl(ref mut s) => s.flush()
         }
     }
 }
