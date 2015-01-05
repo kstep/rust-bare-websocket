@@ -136,7 +136,7 @@ impl WSMessage {
         self.data.push_all(msg.data[]);
     }
 
-    pub fn text(data: &str) -> WSMessage {
+    #[inline] pub fn text(data: &str) -> WSMessage {
         WSMessage {
             header: WS_FIN | WS_OPTEXT,
             data: data.as_bytes().to_vec(),
@@ -144,7 +144,7 @@ impl WSMessage {
         }
     }
 
-    pub fn binary(data: &[u8]) -> WSMessage {
+    #[inline] pub fn binary(data: &[u8]) -> WSMessage {
         WSMessage {
             header: WS_FIN | WS_OPBIN,
             data: data.to_vec(),
@@ -152,25 +152,95 @@ impl WSMessage {
         }
     }
 
-    pub fn masked(&mut self, enabled: bool) {
-        if enabled {
-            self.header.insert(WS_MASK);
-        } else {
-            self.header.remove(WS_MASK);
-        }
+    pub fn first(mut self) -> WSMessage {
+        self.header.remove(WS_FIN);
+        self
+    }
+
+    pub fn more(mut self) -> WSMessage {
+        self.header.remove(WS_FIN | WS_OPCODE);
+        self.header.insert(WS_OPCONT);
+        self
+    }
+
+    pub fn last(mut self) -> WSMessage {
+        self.header.remove(WS_OPCODE);
+        self.header.insert(WS_FIN | WS_OPCONT);
+        self
+    }
+
+    pub fn is_first(&self) -> bool {
+        !self.is_final() && !self.is_cont()
+    }
+
+    pub fn is_last(&self) -> bool {
+        self.is_final() && self.is_cont()
+    }
+
+    pub fn is_more(&self) -> bool {
+        !self.is_final() && self.is_cont()
+    }
+
+    pub fn is_whole(&self) -> bool {
+        self.is_final() && !self.is_cont()
+    }
+
+    #[inline] pub fn is_final(&self) -> bool {
+        self.header.contains(WS_FIN)
+    }
+
+    #[inline] pub fn opcode(&self) -> WSHeader {
+        self.header & WS_OPCODE
+    }
+
+    pub fn mask(mut self) -> WSMessage {
+        self.header.insert(WS_MASK);
+        self
+    }
+
+    pub fn unmask(mut self) -> WSMessage {
+        self.header.remove(WS_MASK);
+        self
     }
 
     pub fn is_masked(&self) -> bool {
         self.header.contains(WS_MASK)
     }
 
-    pub fn close(status: WSStatusCode, data: &str) -> WSMessage {
+    #[inline] pub fn close(status: WSStatusCode, data: &[u8]) -> WSMessage {
         WSMessage {
             header: WS_FIN | WS_OPTERM,
-            data: data.as_bytes().to_vec(),
+            data: data.to_vec(),
             status: Some(status)
         }
     }
+
+    #[inline] pub fn ping(data: &[u8]) -> WSMessage {
+        WSMessage {
+            header: WS_FIN | WS_OPPING,
+            data: data.to_vec(),
+            status: None
+        }
+    }
+
+    #[inline] pub fn pong(data: &[u8]) -> WSMessage {
+        WSMessage {
+            header: WS_FIN | WS_OPPONG,
+            data: data.to_vec(),
+            status: None
+        }
+    }
+
+    pub fn is_control(&self) -> bool {
+        self.header.contains(WS_OPCTRL)
+    }
+
+    #[inline] pub fn is_text(&self) -> bool { self.opcode() == WS_OPTEXT }
+    #[inline] pub fn is_binary(&self) -> bool { self.opcode() == WS_OPBIN }
+    #[inline] pub fn is_ping(&self) -> bool { self.opcode() == WS_OPPING }
+    #[inline] pub fn is_pong(&self) -> bool { self.opcode() == WS_OPPONG }
+    #[inline] pub fn is_close(&self) -> bool { self.opcode() == WS_OPTERM }
+    #[inline] pub fn is_cont(&self) -> bool { self.opcode() == WS_OPCONT }
 }
 
 impl ToJson for WSMessage {
