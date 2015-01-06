@@ -19,6 +19,18 @@ bitflags! {
         const WS_OPPING  = 0b0000100100000000,
         const WS_OPPONG  = 0b0000101000000000,
 
+        // Bits reserved for extensions, check for equality after &-ing with OP_RSV
+        const WS_RSV1 = 0b0100000000000000,
+        const WS_RSV2 = 0b0010000000000000,
+        const WS_RSV3 = 0b0001000000000000,
+
+        // Opcodes reserved for extensions, check for equality after &-ing with OP_OPCODE
+        const WS_OPEXT1 = 0b0000001100000000,
+        const WS_OPEXT2 = 0b0000010000000000,
+        const WS_OPEXT3 = 0b0000010100000000,
+        const WS_OPEXT4 = 0b0000011000000000,
+        const WS_OPEXT5 = 0b0000011100000000,
+
         // Helper masks
         const WS_OPCTRL  = 0b0000100000000000, // if matches with &, this is a control code
         const WS_LEN16   = 0b0000000001111110, // if &WS_LEN equals this, it has 16-bit length
@@ -120,6 +132,15 @@ impl FromPrimitive for WSStatusCode {
     }
 }
 
+// TODO
+// pub struct WSMessage<T=Vec<u8>> {
+//     ...
+//     data: T
+// }
+// pub struct WSDataWithStatus<T=Vec<u8>> {
+//     pub status: WSStatusCode,
+//     pub payload: Vec
+// }
 #[derive(Show)]
 pub struct WSMessage {
     pub header: WSHeader,
@@ -140,6 +161,14 @@ impl WSMessage {
         WSMessage {
             header: WS_FIN | WS_OPTEXT,
             data: data.as_bytes().to_vec(),
+            status: None
+        }
+    }
+
+    #[inline] pub fn ext(extn: u8, data: &[u8]) -> WSMessage {
+        WSMessage {
+            header: WS_FIN | WSHeader::from_bits_truncate((extn & 0x7u8) as u16 << 8),
+            data: data.to_vec(),
             status: None
         }
     }
@@ -235,8 +264,18 @@ impl WSMessage {
         self.header.contains(WS_OPCTRL)
     }
 
+    pub fn rsv(mut self, n: u8) -> WSMessage {
+        self.header.insert(WSHeader::from_bits_truncate((n & 0x7u8) as u16 << 12));
+        self
+    }
+
+    pub fn is_rsv(&self, n: u8) -> bool {
+        (self.header.bits() >> 12) as u8 & 0x7u8 == n
+    }
+
     #[inline] pub fn is_text(&self) -> bool { self.opcode() == WS_OPTEXT }
     #[inline] pub fn is_binary(&self) -> bool { self.opcode() == WS_OPBIN }
+    #[inline] pub fn is_isext(&self, n: u8) -> bool { ((self.opcode().bits() >> 8) as u8 & 0x7u8) == n }
     #[inline] pub fn is_ping(&self) -> bool { self.opcode() == WS_OPPING }
     #[inline] pub fn is_pong(&self) -> bool { self.opcode() == WS_OPPONG }
     #[inline] pub fn is_close(&self) -> bool { self.opcode() == WS_OPTERM }
