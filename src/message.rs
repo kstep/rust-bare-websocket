@@ -167,7 +167,7 @@ impl WSMessage {
 
     #[inline] pub fn ext(extn: u8, data: &[u8]) -> WSMessage {
         WSMessage {
-            header: WS_FIN | WSHeader::from_bits_truncate((extn & 0x7u8) as u16 << 8),
+            header: WS_FIN | WSHeader::from_bits_truncate(((extn & 0x7u8) as u16) << 8),
             data: data.to_vec(),
             status: None
         }
@@ -265,7 +265,7 @@ impl WSMessage {
     }
 
     pub fn rsv(mut self, n: u8) -> WSMessage {
-        self.header.insert(WSHeader::from_bits_truncate((n & 0x7u8) as u16 << 12));
+        self.header.insert(WSHeader::from_bits_truncate(((n & 0x7u8) as u16) << 12));
         self
     }
 

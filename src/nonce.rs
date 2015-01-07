@@ -1,8 +1,7 @@
 use std::rand::{self, Rng};
 use std::ops::Slice;
 use rustc_serialize::base64::{self, ToBase64};
-use crypto::sha1::Sha1;
-use crypto::digest::Digest;
+use sha1::Sha1;
 
 static WEBSOCKET_GUID: &'static [u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
@@ -24,9 +23,9 @@ impl Nonce {
         let n = match self { Nonce(n) => n };
         let mut sha1 = Sha1::new();
         let mut result = [0u8; 20];
-        sha1.input(n.as_bytes());
-        sha1.input(WEBSOCKET_GUID);
-        sha1.result(result.as_mut_slice());
+        sha1.update(n.as_bytes());
+        sha1.update(WEBSOCKET_GUID);
+        sha1.output(result.as_mut_slice());
         Nonce(result.to_base64(base64::STANDARD))
     }
 }

@@ -10,5 +10,7 @@ name = "websocket"
 [dependencies]
 url = "*"
 openssl = "*"
-rust-crypto = "*"
 rustc-serialize = "*"
+
+[dependencies.sha1]
+git = "https://github.com/kstep/rust-sha1.git"
