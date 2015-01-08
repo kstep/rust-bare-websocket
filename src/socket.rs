@@ -55,19 +55,19 @@ impl WebSocket {
     fn write_request(&mut self, nonce: &str) -> IoResult<()> {
         let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::IoErrorKind::NotConnected)) };
 
-        try!(s.write(format!("GET {} HTTP/1.1\r\n", self.url.serialize_path().unwrap_or("/".to_string())).as_bytes()));
-        try!(s.write(format!("Host: {}\r\n", self.url.host().unwrap()).as_bytes()));
-        try!(s.write(format!("Origin: {}\r\n", self.url.serialize_no_fragment()).as_bytes()));
-        try!(s.write(format!("Sec-WebSocket-Key: {}\r\n", nonce).as_bytes()));
+        try!(write!(s, "GET {} HTTP/1.1\r\n", self.url.serialize_path().unwrap_or("/".to_string())));
+        try!(write!(s, "Host: {}\r\n", self.url.host().unwrap()));
+        try!(write!(s, "Origin: {}\r\n", self.url.serialize_no_fragment()));
+        try!(write!(s, "Sec-WebSocket-Key: {}\r\n", nonce));
 
         try!(s.write(b"Upgrade: websocket\r\n"));
         try!(s.write(b"Connection: Upgrade\r\n"));
-        try!(s.write(format!("Sec-WebSocket-Version: {}\r\n", self.version).as_bytes()));
+        try!(write!(s, "Sec-WebSocket-Version: {}\r\n", self.version));
         if let Some(ref protos) = self.protocols {
-            try!(s.write(format!("Sec-WebSocket-Protocol: {}\r\n", protos.connect(", ")).as_bytes()));
+            try!(write!(s, "Sec-WebSocket-Protocol: {}\r\n", protos.connect(", ")));
         }
         if let Some(ref exts) = self.extensions {
-            try!(s.write(format!("Sec-WebSocket-Extensions: {}\r\n", exts.connect(", ")).as_bytes()));
+            try!(write!(s, "Sec-WebSocket-Extensions: {}\r\n", exts.connect(", ")));
         }
         try!(s.write(b"\r\n"));
 
