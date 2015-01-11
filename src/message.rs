@@ -173,7 +173,7 @@ impl WSMessage {
 
     #[inline] pub fn ext(extn: u8, data: &[u8]) -> WSMessage {
         WSMessage {
-            header: WS_FIN | WSHeader::from_bits_truncate((extn as u16) << 8),
+            header: WS_FIN | WSHeader::from_bits_truncate(((extn & 0x0f) as u16) << 8),
             data: data.to_vec(),
             status: None
         }
@@ -281,7 +281,7 @@ impl WSMessage {
 
     #[inline] pub fn is_text(&self) -> bool { self.opcode() == WS_OPTEXT }
     #[inline] pub fn is_binary(&self) -> bool { self.opcode() == WS_OPBIN }
-    #[inline] pub fn is_ext(&self, n: u8) -> bool { ((self.opcode().bits() >> 8) as u8) == n }
+    #[inline] pub fn is_ext(&self, n: u8) -> bool { ((self.opcode().bits() >> 8) as u8) == (n & 0x0f) }
     #[inline] pub fn is_ping(&self) -> bool { self.opcode() == WS_OPPING }
     #[inline] pub fn is_pong(&self) -> bool { self.opcode() == WS_OPPONG }
     #[inline] pub fn is_close(&self) -> bool { self.opcode() == WS_OPTERM }
