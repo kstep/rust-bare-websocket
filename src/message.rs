@@ -156,11 +156,11 @@ pub struct WSMessage {
 
 impl WSMessage {
     pub fn to_string(&self) -> String {
-        String::from_utf8_lossy(self.data[]).into_owned()
+        String::from_utf8_lossy(&*self.data).into_owned()
     }
 
     pub fn push(&mut self, msg: WSMessage) {
-        self.data.push_all(msg.data[]);
+        self.data.push_all(&*msg.data);
     }
 
     #[inline] pub fn text(data: &str) -> WSMessage {
@@ -287,7 +287,7 @@ impl WSMessage {
     #[inline] pub fn is_close(&self) -> bool { self.opcode() == WS_OPTERM }
     #[inline] pub fn is_cont(&self) -> bool { self.opcode() == WS_OPCONT }
 
-    pub fn split(self, maxlen: uint) -> WSFragmentedMessage {
+    pub fn split(self, maxlen: usize) -> WSFragmentedMessage {
         WSFragmentedMessage {
             size: self.data.len() + if self.status.is_none() { 0 } else { 2 },
             original: self,
@@ -299,9 +299,9 @@ impl WSMessage {
 
 pub struct WSFragmentedMessage {
     original: WSMessage,
-    maxsize: uint,
-    pos: uint,
-    size: uint
+    maxsize: usize,
+    pos: usize,
+    size: usize
 }
 
 impl Iterator for WSFragmentedMessage {
@@ -343,7 +343,7 @@ impl Iterator for WSFragmentedMessage {
 
 impl ToJson for WSMessage {
     fn to_json(&self) -> Json {
-        self.to_string()[].parse::<Json>().unwrap()
+        self.to_string().parse::<Json>().unwrap()
     }
 }
 

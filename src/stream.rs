@@ -20,7 +20,7 @@ impl NetworkStream {
 }
 
 impl Reader for NetworkStream {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         match *self {
             NetworkStream::Tcp(ref mut s) => s.read(buf),
             NetworkStream::Ssl(ref mut s) => s.read(buf)

@@ -17,14 +17,14 @@ pub struct WebSocket<S = NetworkStream> {
     pub url: Url,
     hostname: String,
     use_ssl: bool,
-    version: uint,
+    version: u32,
     extensions: Option<Vec<String>>,
     protocols: Option<Vec<String>>
 }
 
 impl WebSocket {
-    pub fn with_options(url: Url, version: uint, protocols: Option<&[&str]>, extensions: Option<&[&str]>) -> WebSocket {
-        let use_ssl = url.scheme[] == "wss";
+    pub fn with_options(url: Url, version: u32, protocols: Option<&[&str]>, extensions: Option<&[&str]>) -> WebSocket {
+        let use_ssl = &*url.scheme == "wss";
 
         let port = match url.port() {
             Some(p) => p,
@@ -48,7 +48,7 @@ impl WebSocket {
     }
 
     fn try_connect(&mut self) -> IoResult<()> {
-        self.stream = Some(BufferedStream::new(try!(NetworkStream::connect(self.hostname[], self.use_ssl))));
+        self.stream = Some(BufferedStream::new(try!(NetworkStream::connect(&*self.hostname, self.use_ssl))));
         Ok(())
     }
 
@@ -77,15 +77,15 @@ impl WebSocket {
     fn read_response(&mut self, nonce: &str) -> IoResult<()> {
         let spaces: &[_] = &[' ', '\t', '\r', '\n'];
         let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::IoErrorKind::NotConnected)) };
-        let status = try!(s.read_line())[].splitn(2, ' ').nth(1).and_then(|s| s.parse::<uint>());
+        let status = try!(s.read_line()).splitn(2, ' ').nth(1).and_then(|s| s.parse::<u16>());
 
         match status {
             Some(101) => (),
             _ => return Err(standard_error(io::InvalidInput))
         }
 
-        let headers = s.lines().map(|r| r.unwrap_or("\r\n".to_string())) .take_while(|l| l[] != "\r\n")
-            .map(|s| s[].splitn(1, ':').map(|s| s.trim_matches(spaces).to_string()).collect::<Vec<String>>())
+        let headers = s.lines().map(|r| r.unwrap_or("\r\n".to_string())) .take_while(|l| &**l != "\r\n")
+            .map(|s| s.splitn(1, ':').map(|s| s.trim_matches(spaces).to_string()).collect::<Vec<String>>())
             .map(|p| (p[0].to_string(), p[1].to_string()))
             .collect::<BTreeMap<String, String>>();
 
@@ -93,7 +93,7 @@ impl WebSocket {
 
         let response = headers.get("Sec-WebSocket-Accept");
         match response {
-            Some(r) if nonce == r[] => (),
+            Some(r) if nonce == *r => (),
             _ => return Err(standard_error(io::InvalidInput))
         }
 
@@ -104,10 +104,10 @@ impl WebSocket {
         let mut nonce = Nonce::new();
 
         try!(self.try_connect());
-        try!(self.write_request(nonce[]));
+        try!(self.write_request(&*nonce));
 
         nonce = nonce.encode();
-        try!(self.read_response(nonce[]));
+        try!(self.read_response(&*nonce));
 
         Ok(())
     }
@@ -117,11 +117,11 @@ impl WebSocket {
         Ok(WSHeader::from_bits_truncate(try!(self.read_be_u16())))
     }
 
-    fn read_length(&mut self, header: &WSHeader) -> IoResult<uint> {
+    fn read_length(&mut self, header: &WSHeader) -> IoResult<u64> {
         let wslen = *header & WS_LEN;
-        if wslen == WS_LEN16 { self.read_be_u16().map(|v| v as uint) }
-        else if wslen == WS_LEN64 { self.read_be_u64().map(|v| v as uint) }
-        else { Ok(wslen.bits() as uint) }
+        if wslen == WS_LEN16 { self.read_be_u16().map(|v| v as u64) }
+        else if wslen == WS_LEN64 { self.read_be_u64() }
+        else { Ok(wslen.bits() as u64) }
     }
 
     pub fn read_message(&mut self) -> IoResult<WSMessage> {
@@ -144,7 +144,7 @@ impl WebSocket {
             None
         };
 
-        let mut data = try!(self.read_exact(len));
+        let mut data = try!(self.read_exact(len as usize));
 
         // If we have mask, decrypt data
         if let Some(mut m) = mask {
@@ -154,7 +154,7 @@ impl WebSocket {
                 // compensate the usage of two mask bytes
                 m = m.rotate_right(16);
             }
-            data = WebSocket::mask_data(data[], m);
+            data = WebSocket::mask_data(&*data, m);
         }
 
         Ok(WSMessage { header: header, data: data, status: status.and_then(FromPrimitive::from_u16) })
@@ -165,7 +165,7 @@ impl WebSocket {
     }
 
     pub fn send_message(&mut self, msg: &WSMessage) -> IoResult<()> {
-        let mut len = msg.data.len();
+        let mut len = msg.data.len() as u64;
         let mut hdr = msg.header - WS_LEN;
 
         // If we have status set, the data length is increased by status size
@@ -174,11 +174,11 @@ impl WebSocket {
         }
 
         // Encode and send length along with header
-        if len < WS_LEN16.bits() as uint {
+        if len < WS_LEN16.bits() as u64 {
             hdr = hdr | WSHeader::from_bits_truncate(len as u16 & WS_LEN.bits());
             try!(self.write_be_u16(hdr.bits()));
 
-        } else if len < u16::MAX as uint {
+        } else if len < u16::MAX as u64 {
             hdr = hdr | WS_LEN16;
             try!(self.write_be_u16(hdr.bits()));
             try!(self.write_be_u16(len as u16));
@@ -202,13 +202,13 @@ impl WebSocket {
                 mask = mask.rotate_right(16);
             }
 
-            try!(self.write(WebSocket::mask_data(msg.data[], mask)[]));
+            try!(self.write(&*WebSocket::mask_data(&*msg.data, mask)));
         } else {
             // Send status code if present
             if let Some(status) = msg.status {
                 try!(self.write_be_u16(status.to_u16().unwrap()));
             }
-            try!(self.write(msg.data[]));
+            try!(self.write(&*msg.data));
         }
 
         self.flush()
@@ -220,7 +220,7 @@ impl WebSocket {
 }
 
 impl Reader for WebSocket {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         match self.stream {
             Some(ref mut s) => s.read(buf),
             None => Err(standard_error(io::IoErrorKind::NotConnected))
@@ -252,7 +252,7 @@ impl Buffer for WebSocket {
         }
     }
 
-    fn consume(&mut self, amt: uint) {
+    fn consume(&mut self, amt: usize) {
         match self.stream {
             Some(ref mut s) => s.consume(amt),
             None => ()
