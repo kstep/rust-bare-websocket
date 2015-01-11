@@ -1,6 +1,6 @@
 [package]
 
-name = "websocket"
+name = "simple-websocket"
 version = "0.0.1"
 authors = ["Konstantin Stepanov <me@kstep.me>"]
 

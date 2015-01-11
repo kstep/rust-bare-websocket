@@ -31,6 +31,12 @@ bitflags! {
         const WS_OPEXT4 = 0b0000011000000000,
         const WS_OPEXT5 = 0b0000011100000000,
 
+        const WS_OPCTL1 = 0b0000101100000000,
+        const WS_OPCTL2 = 0b0000110000000000,
+        const WS_OPCTL3 = 0b0000110100000000,
+        const WS_OPCTL4 = 0b0000111000000000,
+        const WS_OPCTL5 = 0b0000111100000000,
+
         // Helper masks
         const WS_OPCTRL  = 0b0000100000000000, // if matches with &, this is a control code
         const WS_LEN16   = 0b0000000001111110, // if &WS_LEN equals this, it has 16-bit length
@@ -167,7 +173,7 @@ impl WSMessage {
 
     #[inline] pub fn ext(extn: u8, data: &[u8]) -> WSMessage {
         WSMessage {
-            header: WS_FIN | WSHeader::from_bits_truncate(((extn & 0x7u8) as u16) << 8),
+            header: WS_FIN | WSHeader::from_bits_truncate((extn as u16) << 8),
             data: data.to_vec(),
             status: None
         }
@@ -275,7 +281,7 @@ impl WSMessage {
 
     #[inline] pub fn is_text(&self) -> bool { self.opcode() == WS_OPTEXT }
     #[inline] pub fn is_binary(&self) -> bool { self.opcode() == WS_OPBIN }
-    #[inline] pub fn is_isext(&self, n: u8) -> bool { ((self.opcode().bits() >> 8) as u8 & 0x7u8) == n }
+    #[inline] pub fn is_ext(&self, n: u8) -> bool { ((self.opcode().bits() >> 8) as u8) == n }
     #[inline] pub fn is_ping(&self) -> bool { self.opcode() == WS_OPPING }
     #[inline] pub fn is_pong(&self) -> bool { self.opcode() == WS_OPPONG }
     #[inline] pub fn is_close(&self) -> bool { self.opcode() == WS_OPTERM }
