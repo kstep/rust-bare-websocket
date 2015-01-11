@@ -15,6 +15,4 @@ name = "websocket"
 url = "*"
 openssl = "*"
 rustc-serialize = "*"
-
-[dependencies.sha1]
-git = "https://github.com/kstep/rust-sha1.git"
+sha1-hasher = "*"

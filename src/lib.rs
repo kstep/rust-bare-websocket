@@ -5,7 +5,7 @@
 extern crate url;
 extern crate openssl;
 extern crate "rustc-serialize" as rustc_serialize;
-extern crate sha1;
+extern crate "sha1-hasher" as sha1;
 
 #[cfg(test)]
 extern crate test;
