@@ -1,8 +1,12 @@
 [package]
 
-name = "simple-websocket"
+name = "bare-websocket"
 version = "0.0.1"
 authors = ["Konstantin Stepanov <me@kstep.me>"]
+description = "Simple client only WebSocket (RFC6455) implementation with low level protocol details exposed (if needed)"
+repository = "https://github.com/kstep/rust-websocket.git"
+homepage = "https://github.com/kstep/rust-websocket"
+readme = "README.md"
 
 [lib]
 name = "websocket"
