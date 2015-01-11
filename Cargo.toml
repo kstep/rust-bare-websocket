@@ -7,6 +7,7 @@ description = "Simple client only WebSocket (RFC6455) implementation with low le
 repository = "https://github.com/kstep/rust-websocket.git"
 homepage = "https://github.com/kstep/rust-websocket"
 readme = "README.md"
+license = "MIT"
 
 [lib]
 name = "websocket"
