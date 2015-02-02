@@ -6,7 +6,7 @@ use sha1::Sha1;
 
 static WEBSOCKET_GUID: &'static [u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-#[derive(Show, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Nonce(String);
 
 impl Hash<Sha1> for Nonce {

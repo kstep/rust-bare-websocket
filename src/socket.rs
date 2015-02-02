@@ -1,4 +1,4 @@
-use std::io::{self, Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
+use std::old_io::{self, Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
 use std::mem;
 use std::collections::BTreeMap;
 use std::rand::{thread_rng, Rng};
@@ -53,15 +53,15 @@ impl WebSocket {
     }
 
     fn write_request(&mut self, nonce: &str) -> IoResult<()> {
-        let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::IoErrorKind::NotConnected)) };
+        let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(old_io::IoErrorKind::NotConnected)) };
 
         try!(write!(s, "GET {} HTTP/1.1\r\n", self.url.serialize_path().unwrap_or("/".to_string())));
         try!(write!(s, "Host: {}\r\n", self.url.host().unwrap()));
         try!(write!(s, "Origin: {}\r\n", self.url.serialize_no_fragment()));
         try!(write!(s, "Sec-WebSocket-Key: {}\r\n", nonce));
 
-        try!(s.write(b"Upgrade: websocket\r\n"));
-        try!(s.write(b"Connection: Upgrade\r\n"));
+        try!(s.write_all(b"Upgrade: websocket\r\n"));
+        try!(s.write_all(b"Connection: Upgrade\r\n"));
         try!(write!(s, "Sec-WebSocket-Version: {}\r\n", self.version));
         if let Some(ref protos) = self.protocols {
             try!(write!(s, "Sec-WebSocket-Protocol: {}\r\n", protos.connect(", ")));
@@ -69,19 +69,19 @@ impl WebSocket {
         if let Some(ref exts) = self.extensions {
             try!(write!(s, "Sec-WebSocket-Extensions: {}\r\n", exts.connect(", ")));
         }
-        try!(s.write(b"\r\n"));
+        try!(s.write_all(b"\r\n"));
 
         s.flush()
     }
 
     fn read_response(&mut self, nonce: &str) -> IoResult<()> {
         let spaces: &[_] = &[' ', '\t', '\r', '\n'];
-        let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(io::IoErrorKind::NotConnected)) };
+        let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(old_io::IoErrorKind::NotConnected)) };
         let status = try!(s.read_line()).splitn(2, ' ').nth(1).and_then(|s| s.parse::<u16>());
 
         match status {
             Some(101) => (),
-            _ => return Err(standard_error(io::InvalidInput))
+            _ => return Err(standard_error(old_io::InvalidInput))
         }
 
         let headers = s.lines().map(|r| r.unwrap_or("\r\n".to_string())) .take_while(|l| &**l != "\r\n")
@@ -94,7 +94,7 @@ impl WebSocket {
         let response = headers.get("Sec-WebSocket-Accept");
         match response {
             Some(r) if nonce == *r => (),
-            _ => return Err(standard_error(io::InvalidInput))
+            _ => return Err(standard_error(old_io::InvalidInput))
         }
 
         Ok(())
@@ -202,13 +202,13 @@ impl WebSocket {
                 mask = mask.rotate_right(16);
             }
 
-            try!(self.write(&*WebSocket::mask_data(&*msg.data, mask)));
+            try!(self.write_all(&*WebSocket::mask_data(&*msg.data, mask)));
         } else {
             // Send status code if present
             if let Some(status) = msg.status {
                 try!(self.write_be_u16(status.to_u16().unwrap()));
             }
-            try!(self.write(&*msg.data));
+            try!(self.write_all(&*msg.data));
         }
 
         self.flush()
@@ -223,23 +223,23 @@ impl Reader for WebSocket {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         match self.stream {
             Some(ref mut s) => s.read(buf),
-            None => Err(standard_error(io::IoErrorKind::NotConnected))
+            None => Err(standard_error(old_io::IoErrorKind::NotConnected))
         }
     }
 }
 
 impl Writer for WebSocket {
-    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+    fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
         match self.stream {
-            Some(ref mut s) => s.write(buf),
-            None => Err(standard_error(io::IoErrorKind::NotConnected))
+            Some(ref mut s) => s.write_all(buf),
+            None => Err(standard_error(old_io::IoErrorKind::NotConnected))
         }
     }
 
     fn flush(&mut self) -> IoResult<()> {
         match self.stream {
             Some(ref mut s) => s.flush(),
-            None => Err(standard_error(io::IoErrorKind::NotConnected))
+            None => Err(standard_error(old_io::IoErrorKind::NotConnected))
         }
     }
 }
@@ -248,7 +248,7 @@ impl Buffer for WebSocket {
     fn fill_buf<'a>(&'a mut self) -> IoResult<&'a [u8]> {
         match self.stream {
             Some(ref mut s) => s.fill_buf(),
-            None => Err(standard_error(io::IoErrorKind::NotConnected))
+            None => Err(standard_error(old_io::IoErrorKind::NotConnected))
         }
     }
 

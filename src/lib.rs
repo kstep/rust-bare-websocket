@@ -1,11 +1,14 @@
 #![feature(slicing_syntax)]
-#![feature(old_orphan_check)]
-#![allow(unstable)]
+#![feature(rand, io, core, collections, hash)]
+
+#![allow(unused_features)]
+#![feature(test)]
 
 extern crate url;
 extern crate openssl;
 extern crate "rustc-serialize" as rustc_serialize;
 extern crate "sha1-hasher" as sha1;
+#[macro_use] extern crate bitflags;
 
 #[cfg(test)]
 extern crate test;

@@ -14,7 +14,7 @@ fn main() {
 
     let msg = WSMessage::text("Hello, World!"); //.mask();
 
-    ws.send_message(&msg);
+    ws.send_message(&msg).unwrap();
 
     for m in WSMessage::text("Hello, World!").split(5) {
         println!("msg: {:?} {:?}", m, m.to_string());

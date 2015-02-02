@@ -1,4 +1,4 @@
-use std::io::{self, Reader, Writer, IoResult, standard_error, TcpStream};
+use std::old_io::{self, Reader, Writer, IoResult, standard_error, TcpStream};
 use openssl::ssl::{SslMethod, SslStream, SslContext};
 
 pub enum NetworkStream {
@@ -11,8 +11,8 @@ impl NetworkStream {
         let sock = try!(TcpStream::connect(hostname));
 
         if use_ssl {
-            let ctx = try!(SslContext::new(SslMethod::Sslv23).map_err(|_| standard_error(io::OtherIoError)));
-            Ok(NetworkStream::Ssl(try!(SslStream::new(&ctx, sock).map_err(|_| standard_error(io::OtherIoError)))))
+            let ctx = try!(SslContext::new(SslMethod::Sslv23).map_err(|_| standard_error(old_io::OtherIoError)));
+            Ok(NetworkStream::Ssl(try!(SslStream::new(&ctx, sock).map_err(|_| standard_error(old_io::OtherIoError)))))
         } else {
             Ok(NetworkStream::Tcp(sock))
         }
@@ -29,10 +29,10 @@ impl Reader for NetworkStream {
 }
 
 impl Writer for NetworkStream {
-    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+    fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
         match *self {
-            NetworkStream::Tcp(ref mut s) => s.write(buf),
-            NetworkStream::Ssl(ref mut s) => s.write(buf)
+            NetworkStream::Tcp(ref mut s) => s.write_all(buf),
+            NetworkStream::Ssl(ref mut s) => s.write_all(buf)
         }
     }
 

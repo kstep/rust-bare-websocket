@@ -3,7 +3,7 @@ use std::num::{FromPrimitive, ToPrimitive};
 use rustc_serialize::json::{Json, ToJson};
 
 bitflags! {
-    #[derive(Show)] flags WSHeader: u16 {
+    #[derive(Debug)] flags WSHeader: u16 {
         // Main structure, mask with & to get header parts
         const WS_FIN     = 0b1000000000000000, // final flag
         const WS_RSV     = 0b0111000000000000, // reserved
@@ -45,7 +45,7 @@ bitflags! {
 }
 
 // TODO: use this instead of u16
-#[derive(Copy, Show)]
+#[derive(Copy, Debug)]
 pub enum WSStatusCode {
     NoError, // = 1000,
     GoneAway, // = 1001,
@@ -147,7 +147,7 @@ impl FromPrimitive for WSStatusCode {
 //     pub status: WSStatusCode,
 //     pub payload: Vec
 // }
-#[derive(Show)]
+#[derive(Debug)]
 pub struct WSMessage {
     pub header: WSHeader,
     pub data: Vec<u8>,

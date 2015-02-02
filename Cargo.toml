@@ -1,7 +1,7 @@
 [package]
 
 name = "bare-websocket"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Konstantin Stepanov <me@kstep.me>"]
 description = "Simple client only WebSocket (RFC6455) implementation with low level protocol details exposed (if needed)"
 repository = "https://github.com/kstep/rust-websocket.git"
@@ -17,3 +17,4 @@ url = "*"
 openssl = "*"
 rustc-serialize = "*"
 sha1-hasher = "*"
+bitflags = "*"
