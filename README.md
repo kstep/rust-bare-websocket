@@ -1,4 +1,4 @@
-bare-websocket
+bare-websocket <img src="https://img.shields.io/travis/kstep/rust-bare-websocket.png?style=flat-square" />
 ================
 
 WebSocket implementation in Rust (@rust-lang) according to [RFC6455][]
