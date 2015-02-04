@@ -347,8 +347,12 @@ impl ToJson for WSMessage {
     }
 }
 
+#[derive(Copy)]
+pub struct WSMessageParseError;
+
 impl FromStr for WSMessage {
-    #[inline] fn from_str(s: &str) -> Option<WSMessage> {
-        Some(WSMessage::text(s))
+    type Err = WSMessageParseError;
+    #[inline] fn from_str(s: &str) -> Result<WSMessage, WSMessageParseError> {
+        Ok(WSMessage::text(s))
     }
 }

@@ -1,4 +1,5 @@
 #![feature(slicing_syntax)]
+#![feature(core)]
 
 //extern crate "bare-websocket" as websocket;
 extern crate websocket;

@@ -77,7 +77,7 @@ impl WebSocket {
     fn read_response(&mut self, nonce: &str) -> IoResult<()> {
         let spaces: &[_] = &[' ', '\t', '\r', '\n'];
         let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(old_io::IoErrorKind::NotConnected)) };
-        let status = try!(s.read_line()).splitn(2, ' ').nth(1).and_then(|s| s.parse::<u16>());
+        let status = try!(s.read_line()).splitn(2, ' ').nth(1).and_then(|s| s.parse::<u16>().ok());
 
         match status {
             Some(101) => (),
