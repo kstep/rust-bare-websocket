@@ -8,6 +8,7 @@ extern crate url;
 extern crate openssl;
 extern crate "rustc-serialize" as rustc_serialize;
 extern crate "sha1-hasher" as sha1;
+extern crate rand;
 #[macro_use] extern crate bitflags;
 
 #[cfg(test)]

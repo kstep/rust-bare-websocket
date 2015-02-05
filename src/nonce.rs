@@ -1,4 +1,4 @@
-use std::rand::{self, Rng};
+use rand::{self, Rng};
 use std::ops::Deref;
 use rustc_serialize::base64::{self, ToBase64};
 use std::hash::{hash, Hash, Writer};
