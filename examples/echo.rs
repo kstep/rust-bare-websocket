@@ -1,6 +1,3 @@
-#![feature(slicing_syntax)]
-#![feature(core)]
-
 //extern crate "bare-websocket" as websocket;
 extern crate websocket;
 extern crate url;
@@ -10,7 +7,7 @@ use url::Url;
 
 fn main() {
     let url = Url::parse("ws://echo.websocket.org").unwrap();
-    let mut ws = WebSocket::with_options(url, 13, Some(&["chat", "superchat"][]), None);
+    let mut ws = WebSocket::with_options(url, 13, Some(&["chat", "superchat"][..]), None);
     ws.connect().unwrap();
 
     let msg = WSMessage::text("Hello, World!"); //.mask();

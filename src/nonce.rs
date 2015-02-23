@@ -1,21 +1,12 @@
 use rand::{self, Rng};
 use std::ops::Deref;
 use rustc_serialize::base64::{self, ToBase64};
-use std::hash::{hash, Hash, Writer};
 use sha1::Sha1;
 
 static WEBSOCKET_GUID: &'static [u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 #[derive(Debug, PartialEq)]
 pub struct Nonce(String);
-
-impl Hash<Sha1> for Nonce {
-    fn hash(&self, state: &mut Sha1) {
-        let Nonce(ref n) = *self;
-        state.write(n.as_bytes());
-        state.write(WEBSOCKET_GUID);
-    }
-}
 
 impl Nonce {
     pub fn new() -> Nonce {
@@ -29,7 +20,10 @@ impl Nonce {
     }
 
     pub fn encode(self) -> Nonce {
-        Nonce(hash::<Nonce, Sha1>(&self).to_base64(base64::STANDARD))
+        let mut sha1 = Sha1::new();
+        sha1.write_all(self.0.as_bytes()).unwrap();
+        sha1.write_all(WEBSOCKET_GUID).unwrap();
+        Nonce(sha1.finish().to_base64(base64::STANDARD))
     }
 }
 

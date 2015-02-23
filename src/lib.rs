@@ -1,5 +1,4 @@
-#![feature(slicing_syntax)]
-#![feature(rand, io, core, collections, hash)]
+#![feature(rand, old_io, core, collections, hash)]
 
 #![allow(unused_features)]
 #![feature(test)]
