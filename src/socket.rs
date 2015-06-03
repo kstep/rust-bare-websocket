@@ -1,4 +1,4 @@
-use std::old_io::{self, Buffer, Reader, Writer, IoResult, BufferedStream, standard_error};
+use std::io::{Read, Write, BufRead, BufStream, self};
 use std::mem;
 use std::collections::BTreeMap;
 use std::u16;
@@ -13,7 +13,7 @@ use stream::NetworkStream;
 
 
 pub struct WebSocket<S = NetworkStream> {
-    stream: Option<BufferedStream<S>>,
+    stream: Option<BufStream<S>>,
     pub url: Url,
     hostname: String,
     use_ssl: bool,
@@ -47,13 +47,13 @@ impl WebSocket {
         WebSocket::with_options(url, 1, None, None)
     }
 
-    fn try_connect(&mut self) -> IoResult<()> {
-        self.stream = Some(BufferedStream::new(try!(NetworkStream::connect(&*self.hostname, self.use_ssl))));
+    fn try_connect(&mut self) -> io::Result<()> {
+        self.stream = Some(BufStream::new(try!(NetworkStream::connect(&*self.hostname, self.use_ssl))));
         Ok(())
     }
 
-    fn write_request(&mut self, nonce: &str) -> IoResult<()> {
-        let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(old_io::IoErrorKind::NotConnected)) };
+    fn write_request(&mut self, nonce: &str) -> io::Result<()> {
+        let s = match self.stream { Some(ref mut s) => s, None => return Err(io::Error::new(io::ErrorKind::NotConnected, "client not connected", None)) };
 
         try!(write!(s, "GET {} HTTP/1.1\r\n", self.url.serialize_path().unwrap_or("/".to_string())));
         try!(write!(s, "Host: {}\r\n", self.url.host().unwrap()));
@@ -74,17 +74,22 @@ impl WebSocket {
         s.flush()
     }
 
-    fn read_response(&mut self, nonce: &str) -> IoResult<()> {
+    fn read_response(&mut self, nonce: &str) -> io::Result<()> {
         let spaces: &[_] = &[' ', '\t', '\r', '\n'];
-        let s = match self.stream { Some(ref mut s) => s, None => return Err(standard_error(old_io::IoErrorKind::NotConnected)) };
-        let status = try!(s.read_line()).splitn(2, ' ').nth(1).and_then(|s| s.parse::<u16>().ok());
+        let s = match self.stream { Some(ref mut s) => s, None => return Err(io::Error::new(io::ErrorKind::NotConnected, "client not connected", None)) };
+        let mut lines = s.lines();
+        let status = match lines.next() {
+            Some(Ok(line)) => line.splitn(2, ' ').nth(1).and_then(|s| s.parse::<u16>().ok()),
+            Some(Err(e)) => return Err(e),
+            None => return Err(io::Error::new(io::ErrorKind::InvalidInput, "missing response status", None))
+        };
 
         match status {
             Some(101) => (),
-            _ => return Err(standard_error(old_io::InvalidInput))
+            _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid response status", None))
         }
 
-        let headers = s.lines().map(|r| r.unwrap_or("\r\n".to_string())) .take_while(|l| &**l != "\r\n")
+        let headers = lines.map(|r| r.unwrap_or("\r\n".to_string())) .take_while(|l| &**l != "\r\n")
             .map(|s| s.splitn(1, ':').map(|s| s.trim_matches(spaces).to_string()).collect::<Vec<String>>())
             .map(|p| (p[0].to_string(), p[1].to_string()))
             .collect::<BTreeMap<String, String>>();
@@ -94,13 +99,13 @@ impl WebSocket {
         let response = headers.get("Sec-WebSocket-Accept");
         match response {
             Some(r) if nonce == *r => (),
-            _ => return Err(standard_error(old_io::InvalidInput))
+            _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "missing Sec-WebSocket-Accept header in response", None))
         }
 
         Ok(())
     }
 
-    pub fn connect(&mut self) -> IoResult<()> {
+    pub fn connect(&mut self) -> io::Result<()> {
         let mut nonce = Nonce::new();
 
         try!(self.try_connect());
@@ -112,19 +117,20 @@ impl WebSocket {
         Ok(())
     }
 
-    fn read_header(&mut self) -> IoResult<WSHeader> {
-        // XXX: this is a bug, WSHeader should accept u16
-        Ok(WSHeader::from_bits_truncate(try!(self.read_be_u16())))
+    fn read_header(&mut self) -> io::Result<WSHeader> {
+        let h: u16;
+        try!(self.read(mem::transmute(h)));
+        Ok(WSHeader::from_bits_truncate(h.to_le()))
     }
 
-    fn read_length(&mut self, header: &WSHeader) -> IoResult<u64> {
+    fn read_length(&mut self, header: &WSHeader) -> io::Result<u64> {
         let wslen = *header & WS_LEN;
         if wslen == WS_LEN16 { self.read_be_u16().map(|v| v as u64) }
         else if wslen == WS_LEN64 { self.read_be_u64() }
         else { Ok(wslen.bits() as u64) }
     }
 
-    pub fn read_message(&mut self) -> IoResult<WSMessage> {
+    pub fn read_message(&mut self) -> io::Result<WSMessage> {
         let header = try!(self.read_header());
         let mut len = try!(self.read_length(&header));
 
@@ -164,7 +170,7 @@ impl WebSocket {
         data.iter().enumerate().map(|(i, b)| *b ^ (mask >> ((i % 4) << 3) & 0xff) as u8).collect::<Vec<u8>>()
     }
 
-    pub fn send_message(&mut self, msg: &WSMessage) -> IoResult<()> {
+    pub fn send_message(&mut self, msg: &WSMessage) -> io::Result<()> {
         let mut len = msg.data.len() as u64;
         let mut hdr = msg.header - WS_LEN;
 
@@ -176,28 +182,28 @@ impl WebSocket {
         // Encode and send length along with header
         if len < WS_LEN16.bits() as u64 {
             hdr = hdr | WSHeader::from_bits_truncate(len as u16 & WS_LEN.bits());
-            try!(self.write_be_u16(hdr.bits()));
+            try!(self.write_all(mem::transmute(hdr.bits().to_be())));
 
         } else if len < u16::MAX as u64 {
             hdr = hdr | WS_LEN16;
-            try!(self.write_be_u16(hdr.bits()));
-            try!(self.write_be_u16(len as u16));
+            try!(self.write_all(mem::transmute(hdr.bits().to_be())));
+            try!(self.write_all(mem::transmute(len as u16)));
 
         } else {
             hdr = hdr | WS_LEN64;
-            try!(self.write_be_u16(hdr.bits()));
-            try!(self.write_be_u64(len as u64));
+            try!(self.write_all(mem::transmute(hdr.bits().to_be())));
+            try!(self.write_all(mem::transmute((len as u64).to_be())));
         }
 
         // If user required masking, encrypt all data
         if hdr.contains(WS_MASK) {
             // Generate and send random mask
             let mut mask = thread_rng().gen::<u32>();
-            try!(self.write_be_u32(mask));
+            try!(self.write_all(mem::transmute(mask.to_be())));
 
             // Encrypt status code if present
             if let Some(status) = msg.status {
-                try!(self.write_be_u16(status.to_u16().unwrap() ^ (mask & 0xffff) as u16));
+                try!(self.write_all(mem::transmute((status.to_u16().unwrap() ^ (mask & 0xffff) as u16).to_be())));
                 // compensate for mask already used for status encryption
                 mask = mask.rotate_right(16);
             }
@@ -206,7 +212,7 @@ impl WebSocket {
         } else {
             // Send status code if present
             if let Some(status) = msg.status {
-                try!(self.write_be_u16(status.to_u16().unwrap()));
+                try!(self.write_all(mem::transmute(status.to_u16().unwrap().to_be())));
             }
             try!(self.write_all(&*msg.data));
         }
@@ -219,36 +225,36 @@ impl WebSocket {
     }
 }
 
-impl Reader for WebSocket {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+impl Read for WebSocket {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self.stream {
             Some(ref mut s) => s.read(buf),
-            None => Err(standard_error(old_io::IoErrorKind::NotConnected))
+            None => Err(io::Error::new(io::ErrorKind::NotConnected, "client not connected", None))
         }
     }
 }
 
-impl Writer for WebSocket {
-    fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
+impl Write for WebSocket {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self.stream {
-            Some(ref mut s) => s.write_all(buf),
-            None => Err(standard_error(old_io::IoErrorKind::NotConnected))
+            Some(ref mut s) => s.write(buf),
+            None => Err(io::Error::new(io::ErrorKind::NotConnected, "client not connected", None))
         }
     }
 
-    fn flush(&mut self) -> IoResult<()> {
+    fn flush(&mut self) -> io::Result<()> {
         match self.stream {
             Some(ref mut s) => s.flush(),
-            None => Err(standard_error(old_io::IoErrorKind::NotConnected))
+            None => Err(io::Error::new(io::ErrorKind::NotConnected, "client not connected", None))
         }
     }
 }
 
-impl Buffer for WebSocket {
-    fn fill_buf<'a>(&'a mut self) -> IoResult<&'a [u8]> {
+impl BufRead for WebSocket {
+    fn fill_buf<'a>(&'a mut self) -> io::Result<&'a [u8]> {
         match self.stream {
             Some(ref mut s) => s.fill_buf(),
-            None => Err(standard_error(old_io::IoErrorKind::NotConnected))
+            None => Err(io::Error::new(io::ErrorKind::NotConnected, "client not connected", None))
         }
     }
 
